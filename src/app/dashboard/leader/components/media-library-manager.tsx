@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { getMediaAssets, createMediaAsset, deleteMediaAsset } from '@/app/actions/media';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { uploadImageToR2, deleteR2Object } from '@/app/actions/storage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import type { MediaAsset } from '@/types';
-import { app } from '@/lib/firebase'; // Import the client-side firebase app
-
-const storage = getStorage(app);
 
 export function MediaLibraryManager() {
     const { userProfile } = useAuth();
@@ -55,23 +52,27 @@ export function MediaLibraryManager() {
         }
 
         setIsUploading(true);
-        const fileName = `${Date.now()}-${fileToUpload.name}`;
-        const storageRef = ref(storage, `images/${fileName}`);
 
         try {
-            // 1. Upload file to Firebase Storage
-            const snapshot = await uploadBytes(storageRef, fileToUpload);
-            const downloadURL = await getDownloadURL(snapshot.ref);
+            // 1. Convert file to base64 data URI and upload to Cloudflare R2.
+            const dataUri = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => reject(new Error('Gagal membaca file.'));
+                reader.readAsDataURL(fileToUpload);
+            });
+            const { url, key } = await uploadImageToR2(dataUri, 'images');
 
-            // 2. Create metadata in Firestore via Server Action
-            const newAssetId = snapshot.ref.name.split('.')[0];
+            // 2. Create metadata in Firestore via Server Action.
+            //    Store the full R2 key as fileName so it can be deleted later.
+            const newAssetId = key.split('/').pop()!.split('.')[0];
             const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
 
             const result = await createMediaAsset({
                 id: newAssetId,
                 assetName,
-                fileName,
-                imageUrl: downloadURL,
+                fileName: key,
+                imageUrl: url,
                 tags: tagsArray,
                 uploadedBy: {
                     uid: userProfile.uid,
@@ -80,8 +81,8 @@ export function MediaLibraryManager() {
             });
 
             if (!result.success) {
-                // If Firestore metadata fails, try to delete the uploaded image
-                await deleteObject(storageRef);
+                // If Firestore metadata fails, clean up the uploaded R2 object.
+                await deleteR2Object(key);
                 throw new Error(result.error || 'Gagal menyimpan metadata.');
             }
 

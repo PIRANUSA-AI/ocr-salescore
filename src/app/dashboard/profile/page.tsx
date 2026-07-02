@@ -13,10 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Camera, User, Lock, Save, ArrowLeft } from 'lucide-react';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { app } from '@/lib/firebase';
-
-const storage = getStorage(app);
+import { uploadImageToR2 } from '@/app/actions/storage';
 
 export default function ProfilePage() {
     const { userProfile } = useAuth();
@@ -42,11 +39,16 @@ export default function ProfilePage() {
 
         setUploadingPhoto(true);
         try {
-            const storageRef = ref(storage, `profile_pictures/${userProfile.uid}/${Date.now()}-${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(snapshot.ref);
+            // Convert to base64 data URI and upload to Cloudflare R2 via server action.
+            const dataUri = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => reject(new Error('Gagal membaca file.'));
+                reader.readAsDataURL(file);
+            });
+            const { url } = await uploadImageToR2(dataUri, `profile_pictures/${userProfile.uid}`);
 
-            setPhotoURL(downloadURL);
+            setPhotoURL(url);
             toast({ title: "Foto Diunggah", description: "Jangan lupa simpan perubahan profil Anda." });
         } catch (error) {
             console.error(error);

@@ -5,7 +5,7 @@
 'use server';
 
 import { adminDb } from '@/lib/firebase-admin';
-import { getStorage } from 'firebase-admin/storage';
+import { deleteFromR2 } from '@/lib/r2';
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import type { MediaAsset } from '@/types';
@@ -69,7 +69,8 @@ export async function getMediaAssets(): Promise<MediaAsset[]> {
 }
 
 /**
- * Deletes a media asset from both Firestore and Firebase Storage.
+ * Deletes a media asset from both Firestore and Cloudflare R2.
+ * `fileName` holds the full R2 object key (e.g. "images/123-abc.jpg").
  */
 export async function deleteMediaAsset(assetId: string, fileName: string): Promise<{ success: boolean; error?: string }> {
     if (!assetId || !fileName) {
@@ -81,11 +82,9 @@ export async function deleteMediaAsset(assetId: string, fileName: string): Promi
         const assetRef = adminDb.collection('mediaAssets').doc(assetId);
         await assetRef.delete();
 
-        // Delete the file from Firebase Storage
-        const bucket = getStorage().bucket('nextcast-554f2.appspot.com');
-        const file = bucket.file(`images/${fileName}`);
-        await file.delete();
-        
+        // Delete the file from Cloudflare R2
+        await deleteFromR2(fileName);
+
         return { success: true };
     } catch (error) {
         console.error(`[Action: deleteMediaAsset] Error deleting asset ${assetId}:`, error);
