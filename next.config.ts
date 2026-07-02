@@ -8,9 +8,13 @@ const nextConfig: NextConfig = {
 
   // OCR images (base64-encoded camera/photo uploads) easily exceed the
   // default 1 MB Server Action body limit. Raise it so form/card scans
-  // go through to the GLM vision flow.
-  serverActions: {
-    bodySizeLimit: 15728640,
+  // go through to the vision flow. Must live under `experimental` in
+  // Next 15 — a top-level `serverActions` key is silently ignored (falls
+  // back to the 1 MB default, breaking OCR uploads in production).
+  experimental: {
+    serverActions: {
+      bodySizeLimit: 15728640,
+    },
   },
 
   typescript: {

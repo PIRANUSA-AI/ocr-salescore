@@ -8,15 +8,14 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import axios from 'axios';
 
-// GLM (Zhipu AI) vision endpoint — OpenAI-compatible. OCR is routed here
+// Ollama Cloud vision endpoint — OpenAI-compatible. OCR is routed here
 // instead of Gemini; all other AI flows still use Google via @/ai/genkit.
-const GLM_ENDPOINT =
-  process.env.GLM_ENDPOINT ||
-  'https://api.z.ai/api/coding/paas/v4/chat/completions';
-const GLM_MODEL = process.env.GLM_MODEL || 'glm-4.6v';
+const OLLAMA_ENDPOINT =
+  process.env.OLLAMA_ENDPOINT || 'https://ollama.com/v1/chat/completions';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma3:27b';
 
 /**
- * Extract a JSON object string from GLM's text response.
+ * Extract a JSON object string from the vision model's text response.
  * Handles: ```json fences, conversational prose around the JSON
  * (e.g. "Saya melihat form berikut. { ... }"), and plain JSON.
  */
@@ -27,7 +26,7 @@ function extractJsonObject(text: string): string {
   if (fence) {
     t = fence[1].trim();
   }
-  // If GLM wrapped the JSON in conversational prose, grab the outermost object.
+  // If the model wrapped the JSON in conversational prose, grab the outermost object.
   const first = t.indexOf('{');
   const last = t.lastIndexOf('}');
   if (first !== -1 && last !== -1 && last > first) {
@@ -137,17 +136,17 @@ const extractCustomerFromFormFlow = ai.defineFlow(
     `;
 
     try {
-        console.log("[Flow: extractCustomerFromFormFlow] Calling GLM vision to process form image...");
+        console.log("[Flow: extractCustomerFromFormFlow] Calling Ollama Cloud vision to process form image...");
 
-        const apiKey = process.env.GLM_API_KEY;
+        const apiKey = process.env.OLLAMA_API_KEY;
         if (!apiKey) {
-          throw new Error('GLM_API_KEY belum diset. OCR tidak dapat dijalankan.');
+          throw new Error('OLLAMA_API_KEY belum diset. OCR tidak dapat dijalankan.');
         }
 
         const requestBody = {
-          model: GLM_MODEL,
+          model: OLLAMA_MODEL,
           temperature: 0.0, // maximum determinism for consistent extraction
-          response_format: { type: 'json_object' }, // force JSON output from GLM
+          response_format: { type: 'json_object' }, // force JSON output
           messages: [
             {
               role: 'user',
@@ -166,17 +165,17 @@ const extractCustomerFromFormFlow = ai.defineFlow(
           timeout: 60000,
         };
 
-        // GLM's reasoning model occasionally returns conversational prose
-        // instead of JSON. Retry up to 3 times; each attempt also runs a
-        // tolerant JSON extractor that strips any surrounding prose.
+        // Vision model occasionally returns conversational prose instead of
+        // JSON. Retry up to 3 times; each attempt also runs a tolerant JSON
+        // extractor that strips any surrounding prose.
         const MAX_ATTEMPTS = 3;
         let output: OcrFormResult | undefined;
         let lastError: unknown;
 
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
           try {
-            console.log(`[Flow: extractCustomerFromFormFlow] GLM attempt ${attempt}/${MAX_ATTEMPTS}...`);
-            const response = await axios.post(GLM_ENDPOINT, requestBody, requestConfig);
+            console.log(`[Flow: extractCustomerFromFormFlow] Ollama attempt ${attempt}/${MAX_ATTEMPTS}...`);
+            const response = await axios.post(OLLAMA_ENDPOINT, requestBody, requestConfig);
 
             const rawText: string | undefined =
               response.data?.choices?.[0]?.message?.content;
@@ -197,11 +196,11 @@ const extractCustomerFromFormFlow = ai.defineFlow(
           throw lastError ?? new Error('OCR tidak mengembalikan JSON yang valid setelah beberapa percobaan.');
         }
 
-        console.log("[Flow: extractCustomerFromFormFlow] SUCCESS. GLM form processing complete.");
+        console.log("[Flow: extractCustomerFromFormFlow] SUCCESS. Ollama form processing complete.");
         return output;
 
     } catch (error) {
-        // GLM/axios buries the real cause (quota, rate-limit, bad key) in the
+        // axios buries the real cause (quota, rate-limit, bad key) in the
         // HTTP response body, not error.message — surface it.
         let errorMessage = error instanceof Error ? error.message : 'Unknown error during AI processing.';
         if (axios.isAxiosError(error) && error.response?.data) {

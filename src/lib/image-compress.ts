@@ -2,7 +2,7 @@
  * Compresses an image (File or data URI) on the client so the resulting
  * base64 data URI stays safely under the Server Action body limit.
  *
- * OCR (GLM vision) does not need full camera resolution — ~1600px on the
+ * OCR (Ollama vision) does not need full camera resolution — ~1600px on the
  * long edge is plenty — so this also speeds up the upload and AI processing.
  */
 
