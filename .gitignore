@@ -1,0 +1,40 @@
+# Build & cache
+.next/
+.vscode
+dist/
+build/
+workspace/
+.idx/cache/
+
+# Dependencies
+node_modules/
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Env / rahasia
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Sistem
+.DS_Store
+thumbs.db
+
+# Log & artifacts (jangan di-commit)
+*.log
+salescore-dev.log
+.playwright-mcp/
+.impeccable/
+
+# Build info
+*.tsbuildinfo
+
+# Test/scratch scripts lokal
+test-*.js
+test-*.mjs
+verify-*.mjs
+deploy-rules.mjs

@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Aturan untuk profil pengguna
+    // - Pengguna hanya bisa membaca (get) profil mereka sendiri.
+    // - Peng-guna yang terautentikasi bisa membuat (create) profil mereka saat mendaftar.
+    // - Tidak ada yang boleh melihat daftar semua pengguna (list) atau mengedit profil orang lain.
+    match /users/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+      allow list, update, delete: if false;
+    }
+
+    // Aturan untuk analisis webinar
+    // Pengguna hanya bisa berinteraksi (CRUD) dengan analisis yang mereka buat sendiri.
+    match /analyses/{analysisId} {
+       allow read, write, delete: if request.auth != null && resource.data.createdBy == request.auth.uid;
+    }
+    
+    // Aturan untuk pelanggan
+    // Semua pengguna yang terautentikasi dapat melihat, membuat, dan mengedit pelanggan.
+    // Hanya Leader atau Superadmin yang bisa menghapus.
+    match /customers/{customerId} {
+      allow read, create, update: if request.auth != null;
+      allow delete: if request.auth != null && (request.auth.token.role == 'Leader' || request.auth.token.role == 'Superadmin');
+    }
+
+    // Aturan untuk Konfigurasi Aplikasi (Maintenance)
+    // - Superadmin bisa melakukan apa saja.
+    // - Semua pengguna yang terautentikasi bisa membaca (untuk menyesuaikan UI).
+    match /appConfig/{configId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.role == 'Superadmin';
+    }
+    // Aturan untuk Notifikasi
+    // Pengguna hanya bisa membaca notifikasi milik mereka sendiri.
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Write dilakukan via Admin SDK di server action, tapi jika perlu dari client:
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid; 
+    }
+
+    // Aturan untuk Email Blast History
+    // Simpan history email blast
+    match /email_blasts/{blastId} {
+      allow read, create: if request.auth != null;
+    }
+  }
+}
