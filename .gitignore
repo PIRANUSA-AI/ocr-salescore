@@ -36,6 +36,10 @@ salescore-dev.log
 # Test/scratch scripts lokal
 test-*.js
 test-*.mjs
+test-*.ts
 verify-*.mjs
 deploy-rules.mjs
+
+# Gambar test berisi data pribadi asli (jangan ke repo public)
+public/test-gambar.*
 .vercel
