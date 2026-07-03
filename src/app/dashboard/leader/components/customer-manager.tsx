@@ -408,10 +408,10 @@ export const CustomerManager = () => {
                     email={emailClientState.email}
                 />
                 <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <CardTitle className="flex items-center gap-2">
-                                <span className="font-headline text-3xl font-bold">Customers</span>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div className="min-w-0">
+                            <CardTitle className="flex flex-wrap items-center gap-2">
+                                <span className="font-headline text-2xl sm:text-3xl font-bold">Customers</span>
                                 {!isLoading && (
                                     <Badge variant="default">{customers.length} Customers</Badge>
                                 )}
@@ -420,33 +420,7 @@ export const CustomerManager = () => {
                                 Kelola semua pelanggan tim Anda, tetapkan sales, dan impor data baru.
                             </CardDescription>
                         </div>
-                        <div className='flex gap-2'>
-                            <ExportButton team={userProfile?.team} className={!isMobile ? "w-auto" : "p-2"} />
-                            <Button variant="outline" size={isMobile ? "icon" : "default"} onClick={() => setIsOcrDialogOpen(true)}>
-                                <ScanLine className={cn("h-4 w-4", !isMobile && "mr-2")} />
-                                {!isMobile && 'OCR'}
-                            </Button>
-                            <Button size={isMobile ? "icon" : "default"} onClick={() => openCustomerEditDialog(null)}>
-                                <PlusCircle className={cn("h-4 w-4", !isMobile && "mr-2")} />
-                                {!isMobile && 'Tambah'}
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div className='flex flex-col sm:flex-row items-start sm:items-center gap-2 pt-4'>
-                        <div className="relative flex-grow w-full">
-                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                            <Input
-                                placeholder='Cari pelanggan, perusahaan, atau telepon...'
-                                className='w-full pl-9'
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                            />
-                        </div>
-                        <div className='flex items-center gap-2'>
+                        <div className='flex flex-wrap items-center gap-2 sm:flex-shrink-0'>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="icon" className="relative">
@@ -507,12 +481,44 @@ export const CustomerManager = () => {
                                     )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                            {isAnyFilterActive && (
-                                <Button variant="ghost" onClick={resetFilters}>
-                                    <X className="mr-2 h-4 w-4" /> Reset
-                                </Button>
-                            )}
+                            <ExportButton team={userProfile?.team} iconOnly={isMobile} />
+                            <Button
+                                size={isMobile ? "default" : "lg"}
+                                className="shadow-md shadow-primary/30"
+                                onClick={() => setIsOcrDialogOpen(true)}
+                            >
+                                OCR
+                                <ScanLine className="h-5 w-5 ml-2" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size={isMobile ? "icon" : "default"}
+                                onClick={() => openCustomerEditDialog(null)}
+                            >
+                                <PlusCircle className={cn("h-4 w-4", !isMobile && "mr-2")} />
+                                {!isMobile && 'Tambah'}
+                            </Button>
                         </div>
+                    </div>
+
+                    <div className='flex flex-col sm:flex-row items-start sm:items-center gap-2 pt-4'>
+                        <div className="relative flex-grow w-full">
+                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                            <Input
+                                placeholder='Cari pelanggan, perusahaan, atau telepon...'
+                                className='w-full pl-9'
+                                value={searchTerm}
+                                onChange={(e) => {
+                                    setSearchTerm(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                            />
+                        </div>
+                        {isAnyFilterActive && (
+                            <Button variant="ghost" onClick={resetFilters}>
+                                <X className="mr-2 h-4 w-4" /> Reset
+                            </Button>
+                        )}
                     </div>
                     <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pt-4'>
                         <div className='flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto'>

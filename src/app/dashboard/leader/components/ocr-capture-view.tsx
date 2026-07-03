@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronDown, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { compressImageToDataUri } from '@/lib/image-compress';
@@ -19,7 +18,7 @@ import type { Customer } from '@/types';
 
 const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
-type Status = 'idle' | 'reading' | 'result' | 'saving';
+type Status = 'collapsed' | 'idle' | 'reading' | 'result' | 'saving';
 
 const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: string }> = {
   high: { ring: 'border-green-500/40 bg-green-500/5', label: 'Yakin', text: 'text-green-600' },
@@ -30,15 +29,16 @@ const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: 
 
 interface Props {
   /** Recent OCR customers to show under the capture card. */
-  recentCustomers: Customer[];
+  recentCustomers?: Customer[];
+  /** When true, starts collapsed showing just a button. Expands on click. */
+  collapsible?: boolean;
 }
 
-export function OcrCaptureView({ recentCustomers }: Props) {
+export function OcrCaptureView({ recentCustomers = [], collapsible = false }: Props) {
   const { userProfile } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
 
-  const [status, setStatus] = useState<Status>('idle');
+  const [status, setStatus] = useState<Status>(collapsible ? 'collapsed' : 'idle');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -51,14 +51,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const recentThree = useMemo(() => recentCustomers.slice(0, 3), [recentCustomers]);
 
   const reset = useCallback(() => {
-    setStatus('idle');
+    setStatus(collapsible ? 'collapsed' : 'idle');
     setImagePreview(null);
     setResult(null);
     setFields({});
     setSalesCode('');
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, []);
+  }, [collapsible]);
 
   const processImage = useCallback(async (dataUri: string) => {
     setStatus('reading');
@@ -166,9 +166,31 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
   // ============ RENDER ============
 
+  if (status === 'collapsed') {
+    return (
+      <Button
+        size="lg"
+        className="h-14 w-full text-base active:translate-y-px"
+        onClick={() => setStatus('idle')}
+      >
+        <ScanLine className="h-5 w-5 mr-2" /> Tambah Scan OCR
+      </Button>
+    );
+  }
+
   if (status === 'idle') {
     return (
-      <div className="flex flex-col gap-6 max-w-md mx-auto w-full">
+      <div className={collapsible ? "flex flex-col gap-3 w-full" : "flex flex-col gap-6 max-w-md mx-auto w-full"}>
+        {collapsible && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="self-end h-7 text-xs"
+            onClick={() => setStatus('collapsed')}
+          >
+            Tutup <ChevronDown className="h-3 w-3" />
+          </Button>
+        )}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -212,14 +234,9 @@ export function OcrCaptureView({ recentCustomers }: Props) {
           </CardContent>
         </Card>
 
-        {recentThree.length > 0 && (
+        {!collapsible && recentThree.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Hasil Terbaru</h3>
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.push('/dashboard?view=history')}>
-                Lihat Semua <ChevronRight className="h-3 w-3" />
-              </Button>
-            </div>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Hasil Terbaru</h3>
             <div className="flex flex-col gap-2">
               {recentThree.map((c) => (
                 <RecentCard key={c.id} customer={c} />

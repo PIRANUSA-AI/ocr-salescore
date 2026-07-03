@@ -23,8 +23,6 @@ import { FadeIn } from '@/components/ui/fade-in';
 import CompanyView from './leader/views/company-view';
 import MediaLibraryView from './leader/views/media-library-view';
 import EmailBlastView from './leader/views/email-blast-view';
-import OcrCaptureViewWrapper from './leader/views/ocr-capture-view';
-import HistoryViewWrapper from './leader/views/history-view';
 // import TodoView from './leader/views/todo-view'; // Task-to-Do (MySQL) dinonaktifkan — fully Firebase
 
 const KanbanBoard = dynamic(() => import('./kanban-board'), {
@@ -256,10 +254,6 @@ export default function SalesDashboard({ activeView }: SalesDashboardProps) {
         }
 
         switch (activeView) {
-            case 'ocr-capture':
-                return <OcrCaptureViewWrapper />;
-            case 'history':
-                return <HistoryViewWrapper />;
             case 'tasks':
                 return <MyTasksTabContent onNavigateToAssistant={handleNavigateToAssistant} />;
             case 'my-customers':

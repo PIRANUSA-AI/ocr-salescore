@@ -15,13 +15,15 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface ExportButtonProps {
     team?: 'AEC' | 'MFG';
     className?: string;
+    iconOnly?: boolean;
 }
 
-export function ExportButton({ team, className }: ExportButtonProps) {
+export function ExportButton({ team, className, iconOnly = false }: ExportButtonProps) {
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
 
@@ -114,9 +116,13 @@ export function ExportButton({ team, className }: ExportButtonProps) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" className={className} disabled={loading}>
-                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Export Data
+                <Button variant="outline" size={iconOnly ? "icon" : "default"} className={className} disabled={loading}>
+                    {loading ? (
+                        <Loader2 className={cn("h-4 w-4 animate-spin", !iconOnly && "mr-2")} />
+                    ) : (
+                        <Download className={cn("h-4 w-4", !iconOnly && "mr-2")} />
+                    )}
+                    {!iconOnly && 'Export Data'}
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
