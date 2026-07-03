@@ -41,6 +41,8 @@ function DashboardUI() {
   }, []);
 
   const getDefaultViewForRole = (role: UserProfile['role']) => {
+    const ocrFocus = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'false') === 'true';
+    if (ocrFocus) return 'ocr-capture';
     switch (role) {
       case 'Leader': return 'customer-manager';
       case 'Sales': return 'my-customers';

@@ -86,7 +86,7 @@ export function AppSidebar({ activeView, onViewChange, featureConfig }: AppSideb
         // both the OCR scan button and the resulting leads list. Reversible —
         // flip NEXT_PUBLIC_OCR_FOCUS_MODE off to restore the full sidebar.
         if ((process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'false') === 'true') {
-            const ocrViewIds = ['customer-manager', 'my-customers'];
+            const ocrViewIds = ['ocr-capture', 'history', 'customer-manager', 'my-customers'];
             return full.filter(item => ocrViewIds.includes(item.id));
         }
 
