@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CustomerManager } from '../components/customer-manager';
 import { CustomerEditDialog } from '../components/customer-edit-dialog';
+import { OcrCaptureView } from '../components/ocr-capture-view';
 import { useDashboard } from '../context/dashboard-context';
+
+const OCR_FOCUS = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'true') === 'true';
 
 export default function CustomerManagementView() {
   const {
@@ -35,6 +38,7 @@ export default function CustomerManagementView() {
 
   return (
     <div className="space-y-6">
+      {OCR_FOCUS && <OcrCaptureView collapsible />}
       <CustomerManager />
       <CustomerEditDialog
         editDialogState={editDialogState}

@@ -30,7 +30,7 @@ import { EmailClientDialog } from '../../dashboard/components/email-client-dialo
 import { FadeIn } from '@/components/ui/fade-in';
 import { OcrCaptureView } from '../leader/components/ocr-capture-view';
 
-const OCR_FOCUS = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'false') === 'true';
+const OCR_FOCUS = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'true') === 'true';
 
 
 const formatCurrency = (value: number | null | undefined) => {

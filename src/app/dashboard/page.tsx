@@ -17,7 +17,7 @@ import { BottomNavbar } from '@/components/dashboard/bottom-navbar';
 import { MobileHeader } from '@/components/dashboard/mobile-header';
 import { baseLeaderMenuItems, baseSalesMenuItems, superadminMenuItems } from '@/lib/constants';
 
-const OCR_FOCUS = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'false') === 'true';
+const OCR_FOCUS = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'true') === 'true';
 
 // --- Main UI component, only rendered on the client ---
 function DashboardUI() {
