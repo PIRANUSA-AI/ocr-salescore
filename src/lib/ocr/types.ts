@@ -1,16 +1,14 @@
-/**
- * Shared types for the OCR pipeline.
- * The pipeline runs a primary model (gpt-4.1) then optionally a second-opinion
- * fallback for fields the primary is unsure about.
- */
-
 export type Confidence = 'high' | 'medium' | 'low' | 'empty';
 
 export interface OcrField {
-  /** Extracted text value, empty string when the field is not found. */
   value: string;
-  /** Model's self-assessed confidence for this field. */
+  alternatives: string[];
   confidence: Confidence;
+}
+
+export interface FormAnswer {
+  question: string;
+  answer: string;
 }
 
 export interface OcrResult {
@@ -21,9 +19,9 @@ export interface OcrResult {
   phone: OcrField;
   email: OcrField;
   softwareNeeds: OcrField;
+  formAnswers?: FormAnswer[];
 }
 
-/** Flat list of the 7 business-card / form fields, in stable order. */
 export const OCR_FIELDS: (keyof OcrResult)[] = [
   'name',
   'company',
@@ -34,7 +32,7 @@ export const OCR_FIELDS: (keyof OcrResult)[] = [
   'softwareNeeds',
 ];
 
-export const OCR_FIELD_LABELS: Record<keyof OcrResult, string> = {
+export const OCR_FIELD_LABELS: Record<string, string> = {
   name: 'Nama',
   company: 'Perusahaan',
   jobTitle: 'Jabatan',
@@ -46,6 +44,7 @@ export const OCR_FIELD_LABELS: Record<keyof OcrResult, string> = {
 
 export interface OcrProvider {
   name: string;
-  /** Extract the 7 fields from an image data URI. */
   extract(imageDataUri: string): Promise<OcrResult>;
 }
+
+export const VALID_CONFIDENCE: Confidence[] = ['high', 'medium', 'low', 'empty'];

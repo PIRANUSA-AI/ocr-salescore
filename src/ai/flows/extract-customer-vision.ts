@@ -1,17 +1,8 @@
 'use server';
 
 import { extractCustomer, type ExtractResult } from '@/lib/ocr/extract';
+import { uploadOcrImage } from '@/lib/r2';
 
-/**
- * New OCR flow (FASE 1).
- *
- * Pipeline: gpt-4.1 (primary) -> second-opinion via gemma3 for fields the
- * primary is unsure about. Returns the 7 business-card / form fields, each
- * with a value and a confidence level, plus which fields the second opinion
- * overrode.
- *
- * This is the server-callable entry point used by the OCR UI.
- */
 export type { ExtractResult } from '@/lib/ocr/extract';
 
 export async function extractCustomerVision(input: {
@@ -21,13 +12,22 @@ export async function extractCustomerVision(input: {
   if (!input?.imageDataUri) {
     throw new Error('Gambar tidak boleh kosong.');
   }
-  console.log('[Flow: extractCustomerVision] primary gpt-4.1, fallback gemma3');
+
+  // ── Step 1: Upload to R2 (wajib) ──
+  // Upload dulu baru scan. Hasil scan akan pakai URL R2, bukan base64.
+  // URL R2 juga dikembalikan supaya bisa disimpan ke DB sebagai referensi.
+  const r2Url = await uploadOcrImage(input.imageDataUri);
+  console.log('[OCR] R2 upload OK →', r2Url);
+
+  // ── Step 2: Scan dari R2 URL ──
+  console.log('[OCR] Scanning from R2 URL...');
   try {
-    const result = await extractCustomer(input.imageDataUri, {
+    const result = await extractCustomer(r2Url, {
       alwaysSecondOpinion: input.alwaysSecondOpinion,
     });
+    result.imageUrl = r2Url;
     console.log(
-      `[Flow: extractCustomerVision] done in ${result.elapsedMs}ms, overridden: [${result.overriddenFields.join(', ')}]`,
+      `[OCR] done in ${result.elapsedMs}ms, imageUrl: ${r2Url}`,
     );
     return result;
   } catch (error) {

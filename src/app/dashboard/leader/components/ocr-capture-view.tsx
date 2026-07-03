@@ -246,14 +246,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   }
 
   // status === 'result' || 'saving'
-  const fieldConfig: { key: string; label: string; conf: Confidence }[] = [
-    { key: 'name', label: 'Nama', conf: result?.name.confidence ?? 'high' },
-    { key: 'company', label: 'Perusahaan', conf: result?.company.confidence ?? 'high' },
-    { key: 'jobTitle', label: 'Jabatan', conf: result?.jobTitle.confidence ?? 'high' },
-    { key: 'division', label: 'Divisi', conf: result?.division.confidence ?? 'empty' },
-    { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high' },
-    { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high' },
-    { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high' },
+  const fieldConfig: { key: string; label: string; conf: Confidence; alternatives: string[] }[] = [
+    { key: 'name', label: 'Nama', conf: result?.name.confidence ?? 'high', alternatives: result?.name.alternatives ?? [] },
+    { key: 'company', label: 'Perusahaan', conf: result?.company.confidence ?? 'high', alternatives: result?.company.alternatives ?? [] },
+    { key: 'jobTitle', label: 'Jabatan', conf: result?.jobTitle.confidence ?? 'high', alternatives: result?.jobTitle.alternatives ?? [] },
+    { key: 'division', label: 'Divisi', conf: result?.division.confidence ?? 'empty', alternatives: result?.division.alternatives ?? [] },
+    { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high', alternatives: result?.phone.alternatives ?? [] },
+    { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high', alternatives: result?.email.alternatives ?? [] },
+    { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high', alternatives: result?.softwareNeeds.alternatives ?? [] },
   ];
 
   return (
@@ -299,9 +299,10 @@ export function OcrCaptureView({ recentCustomers }: Props) {
           </div>
 
           <div className="border-t pt-3 flex flex-col gap-2.5">
-            {fieldConfig.map(({ key, label, conf }) => {
+            {fieldConfig.map(({ key, label, conf, alternatives }) => {
               const style = CONFIDENCE_STYLE[conf];
               const needsCheck = conf === 'medium' || conf === 'low';
+              const hasAlt = alternatives.length > 0;
               return (
                 <div key={key} className={`flex flex-col gap-1 rounded-md border p-2 ${style.ring}`}>
                   <div className="flex items-center justify-between">
@@ -319,6 +320,20 @@ export function OcrCaptureView({ recentCustomers }: Props) {
                     disabled={status === 'saving'}
                     className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0"
                   />
+                  {hasAlt && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {alternatives.map((alt, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setFields((p) => ({ ...p, [key]: alt }))}
+                          className="text-[11px] px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
+                        >
+                          {alt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

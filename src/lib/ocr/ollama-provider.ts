@@ -1,13 +1,7 @@
 import axios from 'axios';
 import type { OcrProvider, OcrResult } from './types';
-import { buildExtractionPrompt, extractJsonObject, coerceOcrResult } from './prompt';
+import { buildOcrMessages, extractJsonObject, coerceOcrResult } from './prompt';
 
-/**
- * Free fallback provider for second-opinion on low-confidence fields.
- * Uses Ollama Cloud (gemma3) via the OpenAI-compatible endpoint.
- * Only specific fields are re-sent (see orchestrator), but this provider can
- * also run a full extraction when needed.
- */
 export function createOllamaProvider(): OcrProvider {
   const apiKey = process.env.OLLAMA_API_KEY;
   const model = process.env.OLLAMA_OCR_MODEL || 'gemma3:12b';
@@ -20,17 +14,20 @@ export function createOllamaProvider(): OcrProvider {
         throw new Error('OLLAMA_API_KEY belum diset.');
       }
 
+      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri);
+
       const response = await axios.post(
         endpoint,
         {
           model,
           temperature: 0,
-          max_tokens: 512,
+          max_tokens: 2048,
           messages: [
+            { role: 'system', content: systemPrompt },
             {
               role: 'user',
               content: [
-                { type: 'text', text: buildExtractionPrompt() },
+                { type: 'text', text: userPrompt },
                 { type: 'image_url', image_url: { url: imageDataUri } },
               ],
             },
