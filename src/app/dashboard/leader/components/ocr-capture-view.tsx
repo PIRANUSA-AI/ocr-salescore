@@ -65,6 +65,15 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       const compressed = await compressImageToDataUri(dataUri);
       // Step 2: Upload to R2 + AI analyze (server-side, one call)
       const res = await extractCustomerVision({ imageDataUri: compressed });
+      if ('rejected' in res) {
+        toast({
+          variant: 'destructive',
+          title: 'Gambar tidak diproses',
+          description: res.message,
+        });
+        reset();
+        return;
+      }
       setImagePreview(res.imageUrl || compressed);
       setResult(res);
       setFields({
