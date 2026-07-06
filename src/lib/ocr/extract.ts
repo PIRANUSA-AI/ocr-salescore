@@ -49,16 +49,17 @@ export async function extractCustomer(
     elapsedMs: 0,
   };
 
-  // ── Stage 2: Verifier (hard-thinking) ──
-  // Uses OPENAI_VERIFIER_MODEL if set, otherwise falls back to the primary model.
+  // ── Stage 2: Verifier (text-only — reviews stage 1 JSON output) ──
+  // Uses OPENAI_VERIFIER_MODEL (e.g. gpt-5-nano) which may not support images.
+  // Only receives the JSON result from stage 1, NOT the image.
   const verifierModel = process.env.OPENAI_VERIFIER_MODEL || process.env.OPENAI_OCR_MODEL || 'gpt-4.1';
   const useVerifier = !options.skipVerifier;
 
   if (useVerifier) {
-    console.log(`[OCR] Stage 2: Verifier (${verifierModel}) — re-extracting from scratch`);
+    console.log(`[OCR] Stage 2: Verifier (${verifierModel}) — reviewing stage 1 output`);
     try {
       const systemPrompt = buildVerifierSystemPrompt();
-      const userPrompt = buildVerifierUserPrompt();
+      const userPrompt = buildVerifierUserPrompt(base);
 
       const verified = await callOpenAI({
         systemPrompt,
@@ -67,7 +68,6 @@ export async function extractCustomer(
         model: verifierModel,
         temperature: 0,
         maxTokens: 2048,
-        imageDataUri,
       });
 
       const verifiedResult = coerceOcrResult(verified);

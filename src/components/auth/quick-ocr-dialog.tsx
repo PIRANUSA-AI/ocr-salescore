@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, UploadCloud, Camera, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getUploadUrl, getR2PresignedUrl } from "@/app/actions/storage";
+import { getUploadUrl } from "@/app/actions/storage";
 import { extractCustomerFromForm } from "@/ai/flows/extract-customer-from-form";
 import { createManualCustomer } from "@/app/actions/leader";
 import { getAssignableUsers } from "@/app/actions/user";
@@ -136,11 +136,10 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
         const blob = dataUriToBlob(compressed);
         const uploadRes = await fetch(uploadUrl, { method: "PUT", body: blob });
         if (!uploadRes.ok) throw new Error("Gagal upload gambar ke Cloudflare R2.");
-        const { url } = await getR2PresignedUrl(key);
-        setImagePreview(url);
-        setOcrImageUrl(url);
         setOcrImageKey(key);
-        const result = await extractCustomerFromForm({ imageUrl: url });
+        const result = await extractCustomerFromForm({ imageKey: key });
+        setImagePreview(result._fullResult?.imageUrl || "");
+        setOcrImageUrl(result._fullResult?.imageUrl || "");
 
         form.reset({
           ...form.getValues(),

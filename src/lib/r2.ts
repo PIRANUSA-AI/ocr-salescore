@@ -58,6 +58,21 @@ export async function getPresignedUrl(
 }
 
 /**
+ * Fetch an object from R2 by key and return it as a base64 data URI.
+ * Used server-side so we can feed the image directly to AI models
+ * without relying on presigned URLs (which some models don't support).
+ */
+export async function getObjectAsDataUri(key: string): Promise<string> {
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  const response = await s3.send(command);
+  const body = await response.Body?.transformToByteArray();
+  if (!body) throw new Error(`Gagal membaca gambar dari R2: ${key}`);
+  const contentType = response.ContentType || 'image/jpeg';
+  const base64 = Buffer.from(body).toString('base64');
+  return `data:${contentType};base64,${base64}`;
+}
+
+/**
  * Generate a presigned PUT URL so the client can upload directly to R2
  * without sending file data through Vercel serverless functions.
  * The client does a PUT request with the image binary to this URL.

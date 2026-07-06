@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Camera, Upload, Check, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getUploadUrl, getR2PresignedUrl } from '@/app/actions/storage';
+import { getUploadUrl } from '@/app/actions/storage';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
@@ -122,10 +122,9 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
             const blob = dataUriToBlob(compressed);
             const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: blob });
             if (!uploadRes.ok) throw new Error('Gagal upload gambar ke Cloudflare R2.');
-            const { url } = await getR2PresignedUrl(key);
-            setImagePreview(url);
             setOcrImageKey(key);
-            const res = await extractCustomerVision({ imageUrl: url });
+            const res = await extractCustomerVision({ imageKey: key });
+            setImagePreview(res.imageUrl || '');
             setResult(res);
             setFields({
                 name: res.name.value,

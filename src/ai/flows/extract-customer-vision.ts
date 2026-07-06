@@ -1,31 +1,43 @@
 'use server';
 
 import { extractCustomer, type ExtractResult } from '@/lib/ocr/extract';
+import { getObjectAsDataUri, getPresignedUrl } from '@/lib/r2';
 
 export type { ExtractResult } from '@/lib/ocr/extract';
 
 /**
  * Analyze an image that has already been uploaded to R2.
- * The client must call uploadOcrImageAction FIRST to get the R2 URL,
- * then pass that URL here — no base64 should be sent to this function.
+ *
+ * Flow:
+ * 1. Client uploads directly to R2 via presigned PUT → gets `imageKey`
+ * 2. Client calls this with the key
+ * 3. Server fetches the image from R2, converts to base64,
+ *    and passes it to the AI pipeline (no presigned URL dependency).
  */
 export async function extractCustomerVision(input: {
-  imageUrl: string;
+  imageKey: string;
   alwaysSecondOpinion?: boolean;
 }): Promise<ExtractResult> {
-  if (!input?.imageUrl) {
-    throw new Error('URL gambar tidak boleh kosong. Upload gambar ke R2 terlebih dahulu.');
+  if (!input?.imageKey) {
+    throw new Error('Key gambar tidak boleh kosong. Upload gambar ke R2 terlebih dahulu.');
   }
 
-  console.log('[OCR] Scanning from R2 URL:', input.imageUrl);
+  console.log('[OCR] Fetching from R2 key:', input.imageKey);
 
   try {
-    const result = await extractCustomer(input.imageUrl, {
+    // Fetch image from R2 server-side → base64 data URI
+    const dataUri = await getObjectAsDataUri(input.imageKey);
+
+    const result = await extractCustomer(dataUri, {
       alwaysSecondOpinion: input.alwaysSecondOpinion,
     });
-    result.imageUrl = input.imageUrl;
+
+    // Generate a fresh presigned URL so the client can display the image
+    const viewUrl = await getPresignedUrl(input.imageKey);
+    result.imageUrl = viewUrl;
+
     console.log(
-      `[OCR] done in ${result.elapsedMs}ms, imageUrl: ${input.imageUrl}`,
+      `[OCR] done in ${result.elapsedMs}ms, key: ${input.imageKey}`,
     );
     return result;
   } catch (error) {

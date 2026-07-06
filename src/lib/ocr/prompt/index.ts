@@ -112,11 +112,10 @@ function inferNameFromEmail(email: string): string | null {
 
 export { buildVerifierSystemPrompt, buildVerifierUserPrompt } from './verifier';
 
-export function buildVerifierMessages(imageDataUri: string, imageContext?: string) {
+export function buildVerifierMessages(primaryResult?: Record<string, any>) {
   return {
     systemPrompt: buildVerifierSystemPrompt(),
-    userPrompt: buildVerifierUserPrompt(imageContext),
-    imageDataUri,
+    userPrompt: buildVerifierUserPrompt(primaryResult),
   };
 }
 

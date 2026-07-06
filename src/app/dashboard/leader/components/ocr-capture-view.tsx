@@ -11,7 +11,7 @@ import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, Aler
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { compressImageToDataUri, dataUriToBlob } from '@/lib/image-compress';
-import { getUploadUrl, getR2PresignedUrl } from '@/app/actions/storage';
+import { getUploadUrl } from '@/app/actions/storage';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import { createManualCustomer } from '@/app/actions/leader';
 import type { ExtractResult } from '@/lib/ocr/extract';
@@ -67,19 +67,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     setStatus('reading');
     try {
       const compressed = await compressImageToDataUri(dataUri);
-      // Step 1: Get presigned upload URL (tiny call — no image data)
       const contentType = 'image/jpeg';
       const { uploadUrl, key } = await getUploadUrl(contentType);
-      // Step 2: Upload langsung ke R2 — gak lewat Vercel
       const blob = dataUriToBlob(compressed);
       const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: blob });
       if (!uploadRes.ok) throw new Error('Gagal upload gambar ke Cloudflare R2.');
-      // Step 3: Get presigned view URL
-      const { url } = await getR2PresignedUrl(key);
-      setImagePreview(url);
       setOcrImageKey(key);
-      // Step 4: Analyze pakai R2 URL
-      const res = await extractCustomerVision({ imageUrl: url });
+      const res = await extractCustomerVision({ imageKey: key });
+      setImagePreview(res.imageUrl || '');
       setResult(res);
       setFields({
         name: res.name.value,
