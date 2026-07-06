@@ -6,20 +6,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { compressImageToDataUri } from '@/lib/image-compress';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import { createManualCustomer } from '@/app/actions/leader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
 import type { Customer } from '@/types';
 
 const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
-type Status = 'idle' | 'reading' | 'result' | 'saving';
+const READING_STEPS = [
+  'Memproses & mengompres gambar',
+  'Menganalisis struktur dokumen',
+  'Mengenali teks (OCR)',
+  'Mengekstrak nama & kontak',
+  'Menyusun data pelanggan',
+];
+
+type Status = 'idle' | 'camera' | 'reading' | 'result' | 'saving';
 
 const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: string }> = {
   high: { ring: 'border-green-500/40 bg-green-500/5', label: 'Yakin', text: 'text-green-600' },
@@ -44,6 +54,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const [salesCode, setSalesCode] = useState<string>('');
   const [eventName, setEventName] = useState('IBT 2026');
   const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
+  const [readingStep, setReadingStep] = useState(0);
 
   useEffect(() => {
     if (userProfile?.team) {
@@ -51,8 +62,19 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     }
   }, [userProfile]);
 
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const stopCamera = useCallback(() => {
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  }, []);
 
   const recentThree = useMemo(() => recentCustomers.slice(0, 3), [recentCustomers]);
 
@@ -64,9 +86,58 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     setSalesCode('');
     setEventName('IBT 2026');
     setCreatorTeam(userProfile?.team || 'AEC');
+    setReadingStep(0);
+    setHasCameraPermission(null);
+    stopCamera();
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [userProfile]);
+  }, [userProfile, stopCamera]);
+
+  useEffect(() => {
+    if (status !== 'reading') { setReadingStep(0); return; }
+    const interval = setInterval(() => {
+      setReadingStep(prev => (prev < READING_STEPS.length - 1 ? prev + 1 : prev));
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [status]);
+
+  useEffect(() => {
+    if (status === 'camera') {
+      const enableCamera = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          setHasCameraPermission(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(() => {});
+          }
+        } catch (err) {
+          console.error('Camera error:', err);
+          setHasCameraPermission(false);
+        }
+      };
+      enableCamera();
+    }
+    return () => { stopCamera(); };
+  }, [status, stopCamera]);
+
+  const handleCaptureImage = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video.videoWidth) {
+      toast({ variant: 'destructive', title: 'Kamera Belum Siap', description: 'Tunggu hingga tampilan kamera muncul.' });
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+    const dataUri = canvas.toDataURL('image/jpeg');
+    stopCamera();
+    processImage(dataUri);
+  };
 
   const processImage = useCallback(async (dataUri: string) => {
     setStatus('reading');
@@ -189,7 +260,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <Button size="lg" className="h-20 text-base active:translate-y-px" onClick={() => cameraInputRef.current?.click()}>
+            <Button size="lg" className="h-20 text-base active:translate-y-px" onClick={() => setStatus('camera')}>
               <Camera className="h-6 w-6 mr-3" /> Foto Langsung
             </Button>
             <Button size="lg" variant="outline" className="h-14 active:translate-y-px" onClick={() => fileInputRef.current?.click()}>
@@ -222,11 +293,68 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     );
   }
 
+  if (status === 'camera') {
+    return (
+      <div className="flex flex-col gap-6 max-w-md mx-auto w-full">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Camera className="h-5 w-5" /> Ambil Foto Kartu Nama
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center gap-4 min-h-[300px] md:min-h-[400px]">
+            <canvas ref={canvasRef} className="hidden" />
+            {hasCameraPermission === false ? (
+              <Alert variant="destructive">
+                <AlertTitle>Akses Kamera Ditolak</AlertTitle>
+                <AlertDescription>Izinkan akses kamera di pengaturan browser Anda.</AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <div className="w-full aspect-[4/3] bg-black rounded-lg overflow-hidden relative border">
+                  <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                </div>
+                <Button onClick={handleCaptureImage} size="lg" className="w-full active:translate-y-px">
+                  <Camera className="mr-2 h-5 w-5" /> Ambil Gambar
+                </Button>
+              </>
+            )}
+            <Button variant="outline" className="w-full active:translate-y-px" onClick={() => setStatus('idle')}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (status === 'reading') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-md mx-auto w-full gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground text-center">AI sedang membaca gambar...</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-md mx-auto w-full gap-6">
+        <div className="w-full space-y-3">
+          <p className="text-center text-sm font-medium text-muted-foreground mb-4">AI sedang membaca dokumen...</p>
+          {READING_STEPS.map((label, i) => {
+            const isDone = i < readingStep;
+            const isActive = i === readingStep;
+            return (
+              <div key={label} className={cn(
+                "flex items-center gap-3 rounded-md border p-3 transition-colors",
+                isActive ? "border-primary bg-primary/5" : isDone ? "border-transparent opacity-60" : "border-transparent opacity-40"
+              )}>
+                <span className="flex h-6 w-6 items-center justify-center flex-shrink-0">
+                  {isDone ? (
+                    <Check className="h-5 w-5 text-green-600" />
+                  ) : isActive ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  ) : (
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                  )}
+                </span>
+                <span className={cn("text-sm", isActive && "font-medium text-foreground")}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
         {imagePreview && (
           <div className="w-full aspect-video rounded-lg overflow-hidden border bg-muted">
             <img src={imagePreview} alt="Pratinjau" className="w-full h-full object-contain" />
