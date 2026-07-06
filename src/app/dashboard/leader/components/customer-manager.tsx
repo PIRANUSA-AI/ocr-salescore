@@ -3,7 +3,7 @@
 
 
 'use client';
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -106,6 +106,8 @@ export const CustomerManager = () => {
     const { customers, salesTeam, isLoading, refreshAllData, handleAssignSalesToEntity, openCustomerEditDialog, userProfile, handleBulkDelete, handleBulkAssign } = useDashboard();
 
     const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
+    const [ocrCapturedImage, setOcrCapturedImage] = useState<string | null>(null);
+    const ocrCameraRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [previewData, setPreviewData] = useState<any[]>([]);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -382,6 +384,20 @@ export const CustomerManager = () => {
     }, [customers, selectedCustomers]);
 
 
+    const handleOcrCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            setOcrCapturedImage(reader.result as string);
+            setIsOcrDialogOpen(true);
+        };
+        reader.readAsDataURL(file);
+        // reset input so selecting the same file again still fires onChange
+        e.target.value = '';
+    };
+
+
     return (
         <FadeIn>
             <Card>
@@ -490,10 +506,11 @@ export const CustomerManager = () => {
                     </div>
 
                     <div className="pt-4">
+                        <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleOcrCapture} />
                         <Button
                             size="lg"
                             className="h-14 w-full text-base shadow-md shadow-primary/30 active:translate-y-px"
-                            onClick={() => setIsOcrDialogOpen(true)}
+                            onClick={() => { isMobile ? ocrCameraRef.current?.click() : setIsOcrDialogOpen(true); }}
                         >
                             <ScanLine className="h-5 w-5 mr-2" /> OCR
                         </Button>
@@ -501,9 +518,10 @@ export const CustomerManager = () => {
 
                     <OcrImportDialog
                         isOpen={isOcrDialogOpen}
-                        onOpenChange={setIsOcrDialogOpen}
+                        onOpenChange={(open) => { setIsOcrDialogOpen(open); if (!open) setOcrCapturedImage(null); }}
                         onCustomerAdded={refreshAllData}
-                        autoStartCamera
+                        capturedImage={isMobile ? ocrCapturedImage : null}
+                        startInCameraMode={!isMobile}
                     />
 
                     <div className='flex flex-col sm:flex-row items-start sm:items-center gap-2 pt-4'>

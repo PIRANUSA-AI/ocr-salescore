@@ -13,7 +13,11 @@ import type { UserProfile } from '@/types';
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DashboardHeader } from '@/components/dashboard/header';
 import { AppSidebar } from '@/components/dashboard/app-sidebar';
+import { BottomNavbar } from '@/components/dashboard/bottom-navbar';
+import { MobileHeader } from '@/components/dashboard/mobile-header';
 import { baseLeaderMenuItems, baseSalesMenuItems, superadminMenuItems } from '@/lib/constants';
+
+const OCR_FOCUS = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'true') === 'true';
 
 // --- Main UI component, only rendered on the client ---
 function DashboardUI() {
@@ -41,8 +45,12 @@ function DashboardUI() {
   }, []);
 
   const getDefaultViewForRole = (role: UserProfile['role']) => {
-    const ocrFocus = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'false') === 'true';
-    if (ocrFocus) return 'ocr-capture';
+    if (OCR_FOCUS) {
+      switch (role) {
+        case 'Sales': return 'my-customers';
+        default: return 'customer-manager';
+      }
+    }
     switch (role) {
       case 'Leader': return 'customer-manager';
       case 'Sales': return 'my-customers';
@@ -95,6 +103,23 @@ function DashboardUI() {
         return <p>Peran tidak diketahui.</p>;
     }
   };
+
+  if (OCR_FOCUS) {
+    return (
+      <div className="flex h-screen w-full flex-col bg-muted/40 overflow-hidden">
+        <MobileHeader />
+        <main
+          id="dashboard-main"
+          className="flex flex-1 flex-col gap-4 px-4 pb-24 overflow-auto pt-3"
+        >
+          <Suspense fallback={<div className="flex h-full w-full items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+            {renderDashboardContent()}
+          </Suspense>
+        </main>
+        <BottomNavbar activeView={activeView} onViewChange={handleViewChange} />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>

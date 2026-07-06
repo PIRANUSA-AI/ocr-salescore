@@ -5,7 +5,7 @@ import { buildOcrMessages, extractJsonObject, coerceOcrResult } from './prompt';
 export function createOllamaProvider(): OcrProvider {
   const apiKey = process.env.OLLAMA_API_KEY;
   const model = process.env.OLLAMA_OCR_MODEL || 'gemma3:12b';
-  const endpoint = process.env.OLLAMA_ENDPOINT || 'https://ollama.com/v1/chat/completions';
+  const endpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434/v1/chat/completions';
 
   return {
     name: `ollama:${model}`,

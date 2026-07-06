@@ -1,31 +1,23 @@
-
-
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
-import { useForm, Controller, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, UploadCloud, Camera, Check } from 'lucide-react';
+import { Loader2, Camera, Upload, Check, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { extractCustomerFromForm } from '@/ai/flows/extract-customer-from-form';
+import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
+import type { ExtractResult } from '@/lib/ocr/extract';
+import type { Confidence } from '@/lib/ocr/types';
 import { createManualCustomer } from '@/app/actions/leader';
 import { compressImageToDataUri } from '@/lib/image-compress';
-import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CUSTOMER_SOURCES, CustomerSource } from '@/types';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useDashboard } from '../context/dashboard-context';
-import { DatePicker } from '@/components/ui/date-picker';
+import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-
-// Define a specific list of sources for OCR context
-const OCR_INTERACTION_SOURCES: CustomerSource[] = ['Pameran', 'Workshop', 'Visit', 'Training', 'Troubleshoot', 'Lainnya'];
+const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
 // Progressive steps shown while the AI reads the document
 const READING_STEPS = [
@@ -36,61 +28,42 @@ const READING_STEPS = [
     'Menyusun data pelanggan',
 ];
 
-const FormAnswerSchema = z.object({
-    question: z.string(),
-    answer: z.string(),
-});
+const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: string }> = {
+    high: { ring: 'border-green-500/40 bg-green-500/5', label: 'Yakin', text: 'text-green-600' },
+    medium: { ring: 'border-yellow-500/40 bg-yellow-500/5', label: 'Kurang yakin, cek lagi', text: 'text-yellow-600' },
+    low: { ring: 'border-red-500/40 bg-red-500/5', label: 'Ragu, wajib dicek', text: 'text-red-600' },
+    empty: { ring: 'border-muted', label: 'Kosong', text: 'text-muted-foreground' },
+};
 
-// Define the shape of the data for the final customer creation
-const FinalCustomerSchema = z.object({
-    name: z.string().min(1, 'Nama wajib diisi.'),
-    email: z.string().email('Email tidak valid.').optional().or(z.literal('')),
-    phone: z.string().optional(),
-    company: z.string().optional(),
-    jobTitle: z.string().optional(),
-
-    // New acquisition context
-    acquisitionContext: z.object({
-        source: z.enum(CUSTOMER_SOURCES, { required_error: "Sumber interaksi harus dipilih." }),
-        eventName: z.string().min(1, "Nama/Konteks Acara wajib diisi."),
-        eventDate: z.date({ required_error: 'Tanggal Acara/Interaksi wajib diisi.' }),
-    }),
-
-    formAnswers: z.array(FormAnswerSchema).optional(),
-});
-
-type FormData = z.infer<typeof FinalCustomerSchema>;
+type Status = 'idle' | 'camera' | 'reading' | 'result' | 'saving';
 
 interface OcrImportDialogProps {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     onCustomerAdded: () => void;
-    autoStartCamera?: boolean;
+    /** Image (data URI) captured externally — when provided, skips idle and processes immediately. */
+    capturedImage?: string | null;
+    /** On open, jump straight into the in-page camera (used on desktop where native capture is unavailable). */
+    startInCameraMode?: boolean;
 }
 
-export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, autoStartCamera = false }: OcrImportDialogProps) {
-    const [status, setStatus] = useState<'idle' | 'reading' | 'mapping' | 'saving' | 'camera'>('idle');
+export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capturedImage = null, startInCameraMode = false }: OcrImportDialogProps) {
+    const { userProfile } = useDashboard();
+    const { toast } = useToast();
+
+    const [status, setStatus] = useState<Status>('idle');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+    const [result, setResult] = useState<ExtractResult | null>(null);
+    const [fields, setFields] = useState<Record<string, string>>({});
+    const [salesCode, setSalesCode] = useState<string>('');
+    const [eventName, setEventName] = useState('');
     const [readingStep, setReadingStep] = useState(0);
+    const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+
+    const cameraInputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { toast } = useToast();
-    const { userProfile } = useDashboard();
-
-    const form = useForm<FormData>({
-        resolver: zodResolver(FinalCustomerSchema),
-        defaultValues: {
-            formAnswers: [],
-        }
-    });
-
-    const { fields: formAnswerFields, replace: replaceFormAnswers } = useFieldArray({
-        control: form.control,
-        name: "formAnswers"
-    });
-
 
     const stopCamera = useCallback(() => {
         if (videoRef.current?.srcObject) {
@@ -100,173 +73,25 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, autoSta
     }, []);
 
     const resetState = useCallback(() => {
-        setStatus(autoStartCamera ? 'camera' : 'idle');
+        setStatus('idle');
         setImagePreview(null);
+        setResult(null);
+        setFields({});
+        setSalesCode('');
+        setReadingStep(0);
+        setHasCameraPermission(null);
         stopCamera();
-        form.reset();
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    }, [form, stopCamera, autoStartCamera]);
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }, [stopCamera]);
 
-    // Effect to reset state when dialog closes
+    // Reset state when card closes
     useEffect(() => {
         if (!isOpen) {
-            const timer = setTimeout(() => {
-                resetState();
-            }, 300); // Delay reset to allow for closing animation
+            const timer = setTimeout(() => { resetState(); }, 300);
             return () => clearTimeout(timer);
         }
     }, [isOpen, resetState]);
-
-    // When opening with autoStartCamera, skip upload screen and go straight to camera
-    useEffect(() => {
-        if (isOpen && autoStartCamera) {
-            setStatus('camera');
-        }
-    }, [isOpen, autoStartCamera]);
-
-
-    const handleClose = () => {
-        if (status === 'saving') return;
-        onOpenChange(false);
-    }
-
-    const processImage = useCallback(async (imageDataUri: string) => {
-        try {
-            const compressed = await compressImageToDataUri(imageDataUri);
-            const result = await extractCustomerFromForm({ imageDataUri: compressed });
-
-            form.reset({
-                name: result.name || '',
-                company: result.company || '',
-                jobTitle: result.jobTitle || '',
-                email: result.email || '',
-                phone: result.phone || '',
-                acquisitionContext: {
-                    source: 'Pameran', // Default source
-                    eventName: '',
-                    eventDate: new Date(),
-                },
-                formAnswers: result.formAnswers || [],
-            });
-
-            // useFieldArray is better managed with 'replace'
-            replaceFormAnswers(result.formAnswers || []);
-
-            setStatus('mapping');
-        } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Gagal Ekstraksi OCR',
-                description: error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui.',
-            });
-            resetState();
-        }
-    }, [form, resetState, toast, replaceFormAnswers]);
-
-
-    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        setStatus('reading');
-        setImagePreview(URL.createObjectURL(file));
-
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onloadend = async () => {
-            const imageDataUri = reader.result as string;
-            await processImage(imageDataUri);
-        };
-    };
-
-    const handleCaptureImage = () => {
-        if (!videoRef.current || !canvasRef.current) return;
-        const videoEl = videoRef.current;
-        if (!videoEl.videoWidth) {
-            toast({ variant: 'destructive', title: 'Kamera Belum Siap', description: 'Tunggu hingga tampilan kamera muncul, lalu coba lagi.' });
-            return;
-        }
-        setStatus('reading');
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const context = canvas.getContext('2d');
-        if (context) {
-            context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-            const imageDataUri = canvas.toDataURL('image/jpeg');
-            setImagePreview(imageDataUri);
-            stopCamera(); // Stop camera after capture
-            processImage(imageDataUri);
-        }
-    };
-
-    const onSubmit = async (data: FormData) => {
-        if (!userProfile) {
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Profil pengguna tidak teridentifikasi. Gagal menyimpan.',
-            });
-            return;
-        }
-
-        setStatus('saving');
-        try {
-            await createManualCustomer({
-                ...data,
-                creatorTeam: userProfile.team,
-                products: [],
-                // Source is now part of acquisitionContext
-                assignedSalesId: null, // Leaders add customers as unassigned
-                assignedSalesName: null,
-            });
-
-            toast({ title: 'Sukses', description: `Pelanggan "${data.name}" berhasil ditambahkan dari gambar.` });
-            onCustomerAdded();
-            handleClose();
-        } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Gagal Menyimpan Pelanggan',
-                description: error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui.',
-            });
-            setStatus('mapping');
-        }
-    };
-
-    useEffect(() => {
-        if (isOpen && status === 'camera') {
-            const getCameraPermission = async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: 'environment',
-                        }
-                    });
-                    setHasCameraPermission(true);
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = stream;
-                        videoRef.current.play().catch(() => {});
-                    }
-                } catch (error) {
-                    console.error('Error accessing camera:', error);
-                    setHasCameraPermission(false);
-                }
-            };
-            getCameraPermission();
-
-        } else {
-            stopCamera();
-        }
-
-        return () => {
-            stopCamera();
-        }
-    }, [isOpen, status, stopCamera]);
-
 
     // Cycle through progressive steps while the AI is reading the document
     useEffect(() => {
@@ -280,47 +105,208 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, autoSta
         return () => clearInterval(interval);
     }, [status]);
 
+    const handleClose = () => {
+        if (status === 'saving') return;
+        onOpenChange(false);
+    };
+
+    const processImage = useCallback(async (dataUri: string) => {
+        setStatus('reading');
+        setImagePreview(dataUri);
+        try {
+            const compressed = await compressImageToDataUri(dataUri);
+            const res = await extractCustomerVision({ imageDataUri: compressed });
+            setResult(res);
+            setFields({
+                name: res.name.value,
+                company: res.company.value,
+                jobTitle: res.jobTitle.value,
+                division: res.division.value,
+                phone: res.phone.value,
+                email: res.email.value,
+                softwareNeeds: res.softwareNeeds.value,
+            });
+            setStatus('result');
+        } catch (err) {
+            toast({
+                variant: 'destructive',
+                title: 'Gagal Ekstraksi OCR',
+                description: err instanceof Error ? err.message : 'Terjadi kesalahan.',
+            });
+            resetState();
+        }
+    }, [toast, resetState]);
+
+    // When opened with an externally captured image, process it immediately
+    useEffect(() => {
+        if (isOpen && capturedImage && status === 'idle') {
+            processImage(capturedImage);
+        }
+    }, [isOpen, capturedImage, status, processImage]);
+
+    // Desktop: jump straight into in-page camera when opened in camera mode
+    useEffect(() => {
+        if (isOpen && startInCameraMode && !capturedImage && status === 'idle') {
+            setStatus('camera');
+        }
+    }, [isOpen, startInCameraMode, capturedImage, status]);
+
+    // getUserMedia camera stream for desktop camera mode
+    useEffect(() => {
+        if (isOpen && status === 'camera') {
+            const enableCamera = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    setHasCameraPermission(true);
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        videoRef.current.play().catch(() => {});
+                    }
+                } catch (err) {
+                    console.error('Camera error:', err);
+                    setHasCameraPermission(false);
+                }
+            };
+            enableCamera();
+        }
+        return () => { stopCamera(); };
+    }, [isOpen, status, stopCamera]);
+
+    const handleCaptureImage = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video.videoWidth) {
+            toast({ variant: 'destructive', title: 'Kamera Belum Siap', description: 'Tunggu hingga tampilan kamera muncul.' });
+            return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        const dataUri = canvas.toDataURL('image/jpeg');
+        stopCamera();
+        processImage(dataUri);
+    };
+
+    const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUri = reader.result as string;
+            setImagePreview(dataUri);
+            processImage(dataUri);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const onSave = async () => {
+        if (!userProfile) return;
+        if (!fields.name?.trim()) {
+            toast({ variant: 'destructive', title: 'Nama wajib diisi.' });
+            return;
+        }
+        if (!salesCode) {
+            toast({ variant: 'destructive', title: 'Pilih kode tim sales.' });
+            return;
+        }
+        if (!eventName.trim()) {
+            toast({ variant: 'destructive', title: 'Nama event wajib diisi.' });
+            return;
+        }
+        const emailValue = fields.email?.trim();
+        if (emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+            toast({ variant: 'destructive', title: 'Email tidak valid.', description: 'Perbaiki atau kosongkan field email sebelum menyimpan.' });
+            return;
+        }
+
+        setStatus('saving');
+        try {
+            const formAnswers = [
+                { question: 'Divisi', answer: fields.division || '' },
+                { question: 'Kebutuhan Software', answer: fields.softwareNeeds || '' },
+                { question: 'Kode Tim Sales', answer: salesCode },
+            ].filter((qa) => qa.answer);
+
+            await createManualCustomer({
+                name: fields.name.trim(),
+                company: fields.company?.trim() || '',
+                jobTitle: fields.jobTitle?.trim() || '',
+                phone: fields.phone?.trim() || '',
+                email: fields.email?.trim() || '',
+                creatorTeam: (userProfile.team === 'MFG' ? 'MFG' : 'AEC'),
+                products: [],
+                assignedSalesId: null,
+                assignedSalesName: null,
+                notes: `Kode sales: ${salesCode}`,
+                acquisitionContext: {
+                    source: 'OCR',
+                    eventName: eventName.trim(),
+                    eventDate: new Date(),
+                },
+                formAnswers,
+            } as any);
+
+            toast({ title: 'Tersimpan', description: `Kontak ${fields.name} berhasil ditambahkan.` });
+            onCustomerAdded();
+            handleClose();
+        } catch (err) {
+            toast({
+                variant: 'destructive',
+                title: 'Gagal Menyimpan',
+                description: err instanceof Error ? err.message : 'Terjadi kesalahan.',
+            });
+            setStatus('result');
+        }
+    };
+
+    const fieldConfig: { key: string; label: string; conf: Confidence; alternatives: string[] }[] = [
+        { key: 'name', label: 'Nama', conf: result?.name.confidence ?? 'high', alternatives: result?.name.alternatives ?? [] },
+        { key: 'company', label: 'Perusahaan', conf: result?.company.confidence ?? 'high', alternatives: result?.company.alternatives ?? [] },
+        { key: 'jobTitle', label: 'Jabatan', conf: result?.jobTitle.confidence ?? 'high', alternatives: result?.jobTitle.alternatives ?? [] },
+        { key: 'division', label: 'Divisi', conf: result?.division.confidence ?? 'empty', alternatives: result?.division.alternatives ?? [] },
+        { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high', alternatives: result?.phone.alternatives ?? [] },
+        { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high', alternatives: result?.email.alternatives ?? [] },
+        { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high', alternatives: result?.softwareNeeds.alternatives ?? [] },
+    ];
+
+    if (!isOpen) return null;
 
     const renderContent = () => {
         switch (status) {
+            case 'idle':
+                return (
+                    <div className="flex flex-col gap-3">
+                        <Button size="lg" className="h-20 text-base active:translate-y-px" onClick={() => cameraInputRef.current?.click()}>
+                            <Camera className="h-6 w-6 mr-3" /> Foto Langsung
+                        </Button>
+                        <Button size="lg" variant="outline" className="h-14 active:translate-y-px" onClick={() => fileInputRef.current?.click()}>
+                            <Upload className="h-5 w-5 mr-2" /> Unggah Gambar
+                        </Button>
+                        <p className="text-xs text-muted-foreground text-center pt-1">
+                            Foto kartu nama atau form customer. AI akan mengekstrak datanya.
+                        </p>
+                    </div>
+                );
             case 'camera':
                 return (
-                    <div className="flex flex-col items-center justify-center space-y-4 min-h-[300px] md:min-h-[400px]">
+                    <div className="flex flex-col items-center justify-center gap-4 min-h-[300px] md:min-h-[400px]">
+                        <canvas ref={canvasRef} className="hidden" />
                         {hasCameraPermission === false ? (
                             <Alert variant="destructive">
                                 <AlertTitle>Akses Kamera Ditolak</AlertTitle>
-                                <AlertDescription>
-                                    Izinkan akses kamera di pengaturan browser Anda untuk menggunakan fitur ini.
-                                </AlertDescription>
+                                <AlertDescription>Izinkan akses kamera di pengaturan browser Anda.</AlertDescription>
                             </Alert>
                         ) : (
                             <>
-                                <div className="w-full max-w-[280px] aspect-[9/16] bg-black rounded-lg overflow-hidden relative">
+                                <div className="w-full max-w-xs aspect-[4/3] bg-black rounded-lg overflow-hidden relative">
                                     <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                                    <div className="absolute inset-0 border-4 md:border-[1rem] border-black/30 rounded-lg box-border"></div>
                                 </div>
-                                <Button onClick={handleCaptureImage} size="lg">Ambil Gambar</Button>
+                                <Button onClick={handleCaptureImage} size="lg"><Camera className="mr-2 h-5 w-5" /> Ambil Gambar</Button>
                             </>
                         )}
-                    </div>
-                );
-            case 'idle':
-                return (
-                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/30 rounded-lg p-12 space-y-6 min-h-[300px] md:min-h-[400px]">
-                        <div className="text-center">
-                            <h3 className="text-lg font-medium">Pindai Dokumen</h3>
-                            <p className="text-muted-foreground text-sm mt-1">Gunakan kamera atau unggah gambar form/kartu nama untuk memulai.</p>
-                        </div>
-
-                        <div className='flex flex-col sm:flex-row gap-4 pt-6'>
-                            <Button type="button" onClick={() => fileInputRef.current?.click()}>
-                                <UploadCloud className="mr-2 h-4 w-4" /> Unggah Gambar
-                            </Button>
-                            <Button type="button" variant="secondary" onClick={() => setStatus('camera')}>
-                                <Camera className="mr-2 h-4 w-4" /> Gunakan Kamera
-                            </Button>
-                        </div>
-                        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg, image/webp" className="hidden" />
                     </div>
                 );
             case 'reading':
@@ -352,124 +338,76 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, autoSta
                         </div>
                     </div>
                 );
-            case 'mapping':
+            case 'result':
             case 'saving':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                        <div className="space-y-4">
-                            <div className="relative w-full aspect-[9/16] sm:aspect-video rounded-md overflow-hidden border">
-                                {imagePreview && <Image src={imagePreview} alt="Preview Dokumen" fill objectFit="contain" />}
+                    <div className="flex flex-col gap-4">
+                        {imagePreview && (
+                            <div className="relative w-full h-44 sm:h-52 rounded-md overflow-hidden border">
+                                <Image src={imagePreview} alt="Pratinjau" fill className="object-contain" />
+                            </div>
+                        )}
+                        {result && result.overriddenFields.length > 0 && (
+                            <p className="text-xs text-muted-foreground">Beberapa field ditinjau ulang oleh AI pembanding.</p>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="eventName">Nama Event / Acara <span className="text-red-500">*</span></Label>
+                            <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Contoh: Pameran MFI 2026" disabled={status === 'saving'} />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="salesCode">Kode Tim Sales <span className="text-red-500">*</span></Label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {SALES_CODES.map((code) => (
+                                    <Button key={code} type="button" variant={salesCode === code ? 'default' : 'outline'} size="sm" className="active:translate-y-px" disabled={status === 'saving'} onClick={() => setSalesCode(code)}>
+                                        {code}
+                                    </Button>
+                                ))}
                             </div>
                         </div>
 
-                        <form id="ocr-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto max-h-[60vh] md:max-h-none pr-2">
-                            <p className="text-sm text-muted-foreground">Verifikasi hasil ekstraksi AI dan tambahkan konteks sebelum menyimpan.</p>
-
-                            {/* --- New Acquisition Context Fields --- */}
-                            <div className="p-4 border rounded-md space-y-3 bg-muted/20">
-                                <h4 className="font-medium text-sm">Konteks Akuisisi</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <Label>Sumber Interaksi</Label>
-                                        <Controller
-                                            name="acquisitionContext.source"
-                                            control={form.control}
-                                            render={({ field }) => (
-                                                <Select onValueChange={field.onChange} value={field.value} disabled={status === 'saving'}>
-                                                    <SelectTrigger><SelectValue placeholder="Pilih sumber..." /></SelectTrigger>
-                                                    <SelectContent>
-                                                        {OCR_INTERACTION_SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
+                        <div className="border-t pt-3 flex flex-col gap-2.5">
+                            <p className="text-sm text-muted-foreground">Verifikasi hasil ekstraksi AI. Ketuk alternatif jika ada.</p>
+                            {fieldConfig.map(({ key, label, conf, alternatives }) => {
+                                const style = CONFIDENCE_STYLE[conf];
+                                const needsCheck = conf === 'medium' || conf === 'low';
+                                const hasAlt = alternatives.length > 0;
+                                return (
+                                    <div key={key} className={cn("flex flex-col gap-1 rounded-md border p-2", style.ring)}>
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor={key} className="text-xs">{label}</Label>
+                                            {needsCheck && (
+                                                <span className={cn("text-[10px] flex items-center gap-0.5", style.text)}>
+                                                    <AlertTriangle className="h-3 w-3" /> {style.label}
+                                                </span>
                                             )}
+                                        </div>
+                                        <Input
+                                            id={key}
+                                            value={fields[key] || ''}
+                                            onChange={(e) => setFields((p) => ({ ...p, [key]: e.target.value }))}
+                                            disabled={status === 'saving'}
+                                            className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0"
                                         />
-                                    </div>
-                                    <div>
-                                        <Label>Tanggal Interaksi</Label>
-                                        <Controller
-                                            name="acquisitionContext.eventDate"
-                                            control={form.control}
-                                            render={({ field }) => <DatePicker date={field.value} setDate={field.onChange} disabled={status === 'saving'} />}
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Label>Nama Event / Konteks</Label>
-                                        <Input {...form.register('acquisitionContext.eventName')} placeholder="Contoh: Pameran MFI 2025" disabled={status === 'saving'} />
-                                        {form.formState.errors.acquisitionContext?.eventName && <p className="text-sm text-destructive">{form.formState.errors.acquisitionContext.eventName.message}</p>}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div className="col-span-1 sm:col-span-2">
-                                        <Label htmlFor="name">Nama Lengkap</Label>
-                                        <Input id="name" {...form.register('name')} disabled={status === 'saving'} />
-                                        {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
-                                    </div>
-                                    <div className="col-span-1 sm:col-span-2">
-                                        <Label htmlFor="company">Perusahaan</Label>
-                                        <Input id="company" {...form.register('company')} disabled={status === 'saving'} />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="jobTitle">Jabatan</Label>
-                                        <Input id="jobTitle" {...form.register('jobTitle')} disabled={status === 'saving'} />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="phone">No. Telepon</Label>
-                                        <Input id="phone" {...form.register('phone')} disabled={status === 'saving'} />
-                                    </div>
-                                    <div className="col-span-1 sm:col-span-2">
-                                        <Label htmlFor="email">Email</Label>
-                                        <Input id="email" type="email" {...form.register('email')} disabled={status === 'saving'} />
-                                        {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
-                                    </div>
-                                </div>
-                                <div className="col-span-2 space-y-3 pt-2">
-                                    <Label className="font-medium">Jawaban Form</Label>
-                                    {formAnswerFields.map((field, index) => {
-                                        const isPriorityField = field.question.toLowerCase().includes('prioritas');
-                                        return (
-                                            <div key={field.id} className="space-y-1">
-                                                <Label htmlFor={`form-q-${index}`} className="text-xs text-muted-foreground">{field.question}</Label>
-                                                {isPriorityField ? (
-                                                    <Controller
-                                                        control={form.control}
-                                                        name={`formAnswers.${index}.answer`}
-                                                        render={({ field: controllerField }) => (
-                                                            <Select onValueChange={controllerField.onChange} value={controllerField.value} disabled={status === 'saving'}>
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Pilih prioritas..." />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="none">(Kosong)</SelectItem>
-                                                                    <SelectItem value="Low">Low</SelectItem>
-                                                                    <SelectItem value="Medium">Medium</SelectItem>
-                                                                    <SelectItem value="High">High</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        )}
-                                                    />
-                                                ) : (
-                                                    <Input
-                                                        id={`form-q-${index}`}
-                                                        {...form.register(`formAnswers.${index}.answer`)}
-                                                        disabled={status === 'saving'}
-                                                    />
-                                                )}
+                                        {hasAlt && (
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {alternatives.map((alt, i) => (
+                                                    <button key={i} type="button" onClick={() => setFields((p) => ({ ...p, [key]: alt }))}
+                                                        className="text-[11px] px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
+                                                        {alt}
+                                                    </button>
+                                                ))}
                                             </div>
-                                        );
-                                    })}
-                                    {formAnswerFields.length === 0 && <p className="text-xs text-center text-muted-foreground py-2 border rounded-md">Tidak ada jawaban form yang terdeteksi.</p>}
-                                </div>
-                            </div>
-                        </form>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                )
+                );
         }
     };
-
-    if (!isOpen) return null;
 
     return (
         <Card className="w-full mt-4">
@@ -481,21 +419,26 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, autoSta
             </CardHeader>
 
             <CardContent>
-                <canvas ref={canvasRef} className="hidden" />
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFileSelected} />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileSelected} />
                 {renderContent()}
             </CardContent>
 
-            <CardFooter className="justify-end gap-2">
-                {status !== 'idle' && status !== 'camera' && (
-                    <Button type="button" variant="ghost" onClick={resetState} disabled={status === 'saving' || status === 'reading'}>Mulai Ulang</Button>
-                )}
-                <Button type="button" variant="outline" onClick={handleClose} disabled={status === 'saving'}>Batal</Button>
-                {(status === 'mapping' || status === 'saving') && (
-                    <Button type="submit" form="ocr-form" disabled={status === 'saving'}>
-                        {status === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Simpan Pelanggan
+            <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                {status !== 'idle' && (
+                    <Button type="button" variant="ghost" onClick={resetState} disabled={status === 'saving' || status === 'reading'} className="w-full sm:w-auto">
+                        <RotateCcw className="h-4 w-4 mr-1" /> Mulai Ulang
                     </Button>
                 )}
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <Button type="button" variant="outline" onClick={handleClose} disabled={status === 'saving'} className="flex-1 sm:flex-initial">Batal</Button>
+                    {(status === 'result' || status === 'saving') && (
+                        <Button type="button" onClick={onSave} disabled={status === 'saving'} className="flex-1 sm:flex-initial">
+                            {status === 'saving' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                            Simpan Pelanggan
+                        </Button>
+                    )}
+                </div>
             </CardFooter>
         </Card>
     );

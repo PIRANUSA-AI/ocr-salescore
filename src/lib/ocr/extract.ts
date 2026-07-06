@@ -2,7 +2,7 @@ import { callOpenAI } from '@/ai/openai-client';
 import { createOpenAIProvider } from './openai-provider';
 import { createOllamaProvider } from './ollama-provider';
 import { OCR_FIELDS, type Confidence, type OcrField, type OcrResult } from './types';
-import { buildVerifierSystemPrompt, OcrResultSchema, coerceOcrResult } from './prompt';
+import { buildVerifierSystemPrompt, buildVerifierUserPrompt, OcrResultSchema, coerceOcrResult } from './prompt';
 
 const OCR_SCALAR_FIELDS = OCR_FIELDS.filter((f) => f !== 'formAnswers') as (keyof Omit<OcrResult, 'formAnswers'>)[];
 
@@ -58,7 +58,7 @@ export async function extractCustomer(
     console.log(`[OCR] Stage 2: Verifier (${verifierModel}) — re-extracting from scratch`);
     try {
       const systemPrompt = buildVerifierSystemPrompt();
-      const userPrompt = `Lakukan ekstraksi ulang MANDIRI dari gambar ini. Scan sendiri dari awal tanpa melihat hasil AI lain.`;
+      const userPrompt = buildVerifierUserPrompt();
 
       const verified = await callOpenAI({
         systemPrompt,
@@ -94,7 +94,9 @@ export async function extractCustomer(
   }
 
   // ── Stage 3: Fallback second-opinion for low-confidence fields ──
-  if (needFallback) {
+  // Only attempt when Ollama is explicitly configured, to avoid wasted
+  // timeouts / errors against the broken default endpoint.
+  if (needFallback && process.env.OLLAMA_ENDPOINT) {
     try {
       const fallback = createOllamaProvider();
       const second = await fallback.extract(imageDataUri);
