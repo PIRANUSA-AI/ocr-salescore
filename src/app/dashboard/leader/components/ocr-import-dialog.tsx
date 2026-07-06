@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Camera, Upload, Check, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { uploadOcrImageAction } from '@/app/actions/storage';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
@@ -53,6 +54,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
     const [status, setStatus] = useState<Status>('idle');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [ocrImageKey, setOcrImageKey] = useState<string>('');
     const [result, setResult] = useState<ExtractResult | null>(null);
     const [fields, setFields] = useState<Record<string, string>>({});
     const [salesCode, setSalesCode] = useState<string>('');
@@ -75,6 +77,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
     const resetState = useCallback(() => {
         setStatus('idle');
         setImagePreview(null);
+        setOcrImageKey('');
         setResult(null);
         setFields({});
         setSalesCode('');
@@ -112,10 +115,12 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
     const processImage = useCallback(async (dataUri: string) => {
         setStatus('reading');
-        setImagePreview(dataUri);
         try {
             const compressed = await compressImageToDataUri(dataUri);
-            const res = await extractCustomerVision({ imageDataUri: compressed });
+            const { url, key } = await uploadOcrImageAction(compressed);
+            setImagePreview(url);
+            setOcrImageKey(key);
+            const res = await extractCustomerVision({ imageUrl: url });
             setResult(res);
             setFields({
                 name: res.name.value,
@@ -241,6 +246,8 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                 assignedSalesId: null,
                 assignedSalesName: null,
                 notes: `Kode sales: ${salesCode}`,
+                imageUrl: result?.imageUrl || '',
+                imageKey: ocrImageKey,
                 acquisitionContext: {
                     source: 'OCR',
                     eventName: eventName.trim(),
@@ -343,8 +350,8 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                 return (
                     <div className="flex flex-col gap-4">
                         {imagePreview && (
-                            <div className="relative w-full h-44 sm:h-52 rounded-md overflow-hidden border">
-                                <Image src={imagePreview} alt="Pratinjau" fill className="object-contain" />
+                            <div className="relative w-full h-44 sm:h-52 rounded-md overflow-hidden border bg-muted">
+                                <img src={imagePreview} alt="Pratinjau" className="w-full h-full object-contain" />
                             </div>
                         )}
                         {result && result.overriddenFields.length > 0 && (

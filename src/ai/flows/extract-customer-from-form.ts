@@ -1,7 +1,6 @@
 'use server';
 
 import { extractCustomer } from '@/lib/ocr/extract';
-import { uploadOcrImage } from '@/lib/r2';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { FormAnswer } from '@/lib/ocr/types';
 
@@ -16,26 +15,26 @@ export interface OcrFormResult {
   _fullResult?: ExtractResult;
 }
 
+/**
+ * Analyze a form image that has already been uploaded to R2.
+ * The client must call uploadOcrImageAction FIRST to get the R2 URL,
+ * then pass that URL here — no base64 should be sent to this function.
+ */
 export async function extractCustomerFromForm(input: {
-  imageDataUri: string;
+  imageUrl: string;
 }): Promise<OcrFormResult> {
-  if (!input?.imageDataUri) {
-    throw new Error('Gambar tidak boleh kosong.');
+  if (!input?.imageUrl) {
+    throw new Error('URL gambar tidak boleh kosong. Upload gambar ke R2 terlebih dahulu.');
   }
 
-  // ── Step 1: Upload to R2 (wajib) ──
-  const r2Url = await uploadOcrImage(input.imageDataUri);
-  console.log('[OCR] R2 upload OK →', r2Url);
-
-  // ── Step 2: Scan dari R2 URL ──
-  console.log('[Flow: extractCustomerFromForm] ARIES pipeline');
+  console.log('[Flow: extractCustomerFromForm] ARIES pipeline from R2 URL:', input.imageUrl);
 
   try {
-    const result = await extractCustomer(r2Url, {
+    const result = await extractCustomer(input.imageUrl, {
       alwaysSecondOpinion: true,
     });
 
-    result.imageUrl = r2Url;
+    result.imageUrl = input.imageUrl;
 
     return {
       name: result.name.value || undefined,

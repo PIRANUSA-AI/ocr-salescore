@@ -118,14 +118,16 @@ export type Customer = {
     assignedSalesId: string | null;
     assignedSalesName: string | null;
     pipelineStatus: PipelineStatus;
-    acquisitionContext: AcquisitionContext; // REPLACES `source`
+    acquisitionContext: AcquisitionContext;
     createdAt: string;
     updatedAt: string;
     webinarHistory: { webinarId: string; webinarTitle: string }[];
     potentialRevenue?: number;
-    notes?: CustomerNotes; // Menggunakan tipe CustomerNotes yang baru
+    notes?: CustomerNotes;
     generationHistory?: GenerationHistoryItem[];
-    formAnswers?: FormAnswer[]; // Using flexible form answers structure
+    formAnswers?: FormAnswer[];
+    imageUrl?: string;
+    imageKey?: string;
 };
 
 

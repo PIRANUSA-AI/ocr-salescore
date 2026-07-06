@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, UploadCloud, Camera, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { uploadOcrImageAction } from "@/app/actions/storage";
 import { extractCustomerFromForm } from "@/ai/flows/extract-customer-from-form";
 import { createManualCustomer } from "@/app/actions/leader";
 import { getAssignableUsers } from "@/app/actions/user";
@@ -65,6 +66,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     "idle" | "reading" | "mapping" | "saving" | "camera"
   >("idle");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [ocrImageUrl, setOcrImageUrl] = useState<string>("");
+  const [ocrImageKey, setOcrImageKey] = useState<string>("");
   const [assignableUsers, setAssignableUsers] = useState<UserProfile[]>([]);
   const [hasCameraPermission, setHasCameraPermission] = useState<
     boolean | null
@@ -100,6 +103,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
   const resetState = useCallback(() => {
     setStatus("idle");
     setImagePreview(null);
+    setOcrImageUrl("");
+    setOcrImageKey("");
     stopCamera();
     form.reset();
     if (fileInputRef.current) {
@@ -126,10 +131,14 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     async (imageDataUri: string) => {
       try {
         const compressed = await compressImageToDataUri(imageDataUri);
-        const result = await extractCustomerFromForm({ imageDataUri: compressed });
+        const { url, key } = await uploadOcrImageAction(compressed);
+        setImagePreview(url);
+        setOcrImageUrl(url);
+        setOcrImageKey(key);
+        const result = await extractCustomerFromForm({ imageUrl: url });
 
         form.reset({
-          ...form.getValues(), // Keep selected user and team
+          ...form.getValues(),
           name: result.name || "",
           company: result.company || "",
           jobTitle: result.jobTitle || "",
@@ -222,6 +231,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
         company: data.company,
         jobTitle: data.jobTitle,
         creatorTeam: data.creatorTeam,
+        imageUrl: ocrImageUrl,
+        imageKey: ocrImageKey,
         assignedSalesId: isLeaderAssigningToSelf ? null : selectedUser.uid,
         assignedSalesName: isLeaderAssigningToSelf ? null : selectedUser.name,
 
@@ -384,11 +395,10 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
             <div className="space-y-4">
               <div className="relative w-full aspect-[9/16] rounded-md overflow-hidden border bg-muted">
                 {imagePreview && (
-                  <Image
+                  <img
                     src={imagePreview}
                     alt="Preview Dokumen"
-                    fill
-                    objectFit="contain"
+                    className="w-full h-full object-contain"
                   />
                 )}
               </div>

@@ -1,33 +1,31 @@
 'use server';
 
 import { extractCustomer, type ExtractResult } from '@/lib/ocr/extract';
-import { uploadOcrImage } from '@/lib/r2';
 
 export type { ExtractResult } from '@/lib/ocr/extract';
 
+/**
+ * Analyze an image that has already been uploaded to R2.
+ * The client must call uploadOcrImageAction FIRST to get the R2 URL,
+ * then pass that URL here — no base64 should be sent to this function.
+ */
 export async function extractCustomerVision(input: {
-  imageDataUri: string;
+  imageUrl: string;
   alwaysSecondOpinion?: boolean;
 }): Promise<ExtractResult> {
-  if (!input?.imageDataUri) {
-    throw new Error('Gambar tidak boleh kosong.');
+  if (!input?.imageUrl) {
+    throw new Error('URL gambar tidak boleh kosong. Upload gambar ke R2 terlebih dahulu.');
   }
 
-  // ── Step 1: Upload to R2 (wajib) ──
-  // Upload dulu baru scan. Hasil scan akan pakai URL R2, bukan base64.
-  // URL R2 juga dikembalikan supaya bisa disimpan ke DB sebagai referensi.
-  const r2Url = await uploadOcrImage(input.imageDataUri);
-  console.log('[OCR] R2 upload OK →', r2Url);
+  console.log('[OCR] Scanning from R2 URL:', input.imageUrl);
 
-  // ── Step 2: Scan dari R2 URL ──
-  console.log('[OCR] Scanning from R2 URL...');
   try {
-    const result = await extractCustomer(r2Url, {
+    const result = await extractCustomer(input.imageUrl, {
       alwaysSecondOpinion: input.alwaysSecondOpinion,
     });
-    result.imageUrl = r2Url;
+    result.imageUrl = input.imageUrl;
     console.log(
-      `[OCR] done in ${result.elapsedMs}ms, imageUrl: ${r2Url}`,
+      `[OCR] done in ${result.elapsedMs}ms, imageUrl: ${input.imageUrl}`,
     );
     return result;
   } catch (error) {

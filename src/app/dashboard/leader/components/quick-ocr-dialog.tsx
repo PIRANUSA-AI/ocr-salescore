@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, UploadCloud, Camera, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { uploadOcrImageAction } from '@/app/actions/storage';
 import { extractCustomerFromForm } from '@/ai/flows/extract-customer-from-form';
 import { createManualCustomer } from '@/app/actions/leader';
 import { getAssignableUsers } from '@/app/actions/user';
@@ -60,6 +61,8 @@ interface QuickOcrDialogProps {
 export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     const [status, setStatus] = useState<'idle' | 'reading' | 'mapping' | 'saving' | 'camera'>('idle');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [ocrImageUrl, setOcrImageUrl] = useState<string>('');
+    const [ocrImageKey, setOcrImageKey] = useState<string>('');
     const [assignableUsers, setAssignableUsers] = useState<UserProfile[]>([]);
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
@@ -90,6 +93,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     const resetState = useCallback(() => {
         setStatus('idle');
         setImagePreview(null);
+        setOcrImageUrl('');
+        setOcrImageKey('');
         stopCamera();
         form.reset();
         if (fileInputRef.current) {
@@ -106,10 +111,14 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     const processImage = useCallback(async (imageDataUri: string) => {
         try {
             const compressed = await compressImageToDataUri(imageDataUri);
-            const result = await extractCustomerFromForm({ imageDataUri: compressed });
+            const { url, key } = await uploadOcrImageAction(compressed);
+            setImagePreview(url);
+            setOcrImageUrl(url);
+            setOcrImageKey(key);
+            const result = await extractCustomerFromForm({ imageUrl: url });
 
             form.reset({
-                ...form.getValues(), // Keep selected user and team
+                ...form.getValues(),
                 name: result.name || '',
                 company: result.company || '',
                 jobTitle: result.jobTitle || '',
@@ -187,6 +196,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 ...data,
                 name: data.name || '',
                 creatorTeam: data.creatorTeam,
+                imageUrl: ocrImageUrl,
+                imageKey: ocrImageKey,
                 acquisitionContext: {
                     ...data.acquisitionContext,
                     source: data.acquisitionContext.source as any
@@ -304,7 +315,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                         <div className="space-y-4">
                             <div className="relative w-full aspect-[9/16] rounded-md overflow-hidden border bg-muted">
-                                {imagePreview && <Image src={imagePreview} alt="Preview Dokumen" fill objectFit="contain" />}
+                                {imagePreview && <img src={imagePreview} alt="Preview Dokumen" className="w-full h-full object-contain" />}
                             </div>
                         </div>
 

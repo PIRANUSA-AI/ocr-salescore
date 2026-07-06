@@ -11,6 +11,7 @@ import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, Aler
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { compressImageToDataUri } from '@/lib/image-compress';
+import { uploadOcrImageAction } from '@/app/actions/storage';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import { createManualCustomer } from '@/app/actions/leader';
 import type { ExtractResult } from '@/lib/ocr/extract';
@@ -40,6 +41,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
   const [status, setStatus] = useState<Status>('idle');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [ocrImageKey, setOcrImageKey] = useState<string>('');
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [salesCode, setSalesCode] = useState<string>('');
@@ -53,6 +55,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const reset = useCallback(() => {
     setStatus('idle');
     setImagePreview(null);
+    setOcrImageKey('');
     setResult(null);
     setFields({});
     setSalesCode('');
@@ -64,7 +67,10 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     setStatus('reading');
     try {
       const compressed = await compressImageToDataUri(dataUri);
-      const res = await extractCustomerVision({ imageDataUri: compressed });
+      const { url, key } = await uploadOcrImageAction(compressed);
+      setImagePreview(url);
+      setOcrImageKey(key);
+      const res = await extractCustomerVision({ imageUrl: url });
       setResult(res);
       setFields({
         name: res.name.value,
@@ -142,6 +148,8 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         assignedSalesId: null,
         assignedSalesName: null,
         notes: `Kode sales: ${salesCode}`,
+        imageUrl: result?.imageUrl || '',
+        imageKey: ocrImageKey,
         acquisitionContext: {
           source: 'OCR',
           eventName: eventName.trim(),
@@ -237,8 +245,8 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="text-muted-foreground text-center">AI sedang membaca gambar...</p>
         {imagePreview && (
-          <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
-            <Image src={imagePreview} alt="Pratinjau" fill className="object-contain" />
+          <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-muted">
+            <img src={imagePreview} alt="Pratinjau" className="w-full h-full object-contain" />
           </div>
         )}
       </div>
@@ -259,8 +267,8 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   return (
     <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
       {imagePreview && (
-        <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
-          <Image src={imagePreview} alt="Pratinjau" fill className="object-contain" />
+        <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-muted">
+          <img src={imagePreview} alt="Pratinjau" className="w-full h-full object-contain" />
         </div>
       )}
 

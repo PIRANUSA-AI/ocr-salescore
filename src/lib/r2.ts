@@ -1,18 +1,17 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
 /**
  * Cloudflare R2 storage client (S3-compatible).
- * Replaces Firebase Storage so the app can stay on the free Spark plan.
- * All uploads happen server-side here to keep credentials secret and to
- * avoid CORS/presign complexity.
+ * All uploads happen server-side. Images are served via presigned URLs
+ * so the bucket does NOT need to be publicly accessible.
  */
 
 const accountId = process.env.R2_ACCOUNT_ID;
 const accessKeyId = process.env.R2_ACCESS_KEY_ID;
 const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 const bucket = process.env.R2_BUCKET || 'salescore-ocr';
-const publicUrl = process.env.R2_PUBLIC_URL || '';
 
 if (!accountId || !accessKeyId || !secretAccessKey) {
   console.warn('WARNING: R2 env vars not set. File uploads will fail.');
@@ -24,12 +23,16 @@ export const s3 = new S3Client({
   credentials: { accessKeyId: accessKeyId!, secretAccessKey: secretAccessKey! },
 });
 
-/** Upload a binary buffer and return its public URL. */
+/** Upload a binary buffer and return the object key. */
 export async function uploadToR2(
   buffer: Buffer,
   key: string,
   contentType: string,
 ): Promise<string> {
+  if (!accountId || !accessKeyId || !secretAccessKey) {
+    throw new Error('R2 credentials not configured. Check R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY.');
+  }
+
   await s3.send(
     new PutObjectCommand({
       Bucket: bucket,
@@ -38,17 +41,26 @@ export async function uploadToR2(
       ContentType: contentType,
     }),
   );
-  return `${publicUrl}/${key}`;
+
+  return key;
+}
+
+/**
+ * Generate a presigned URL for viewing/downloading an R2 object.
+ * Expires in 1 hour by default — allows the frontend to view the image
+ * without making the bucket public.
+ */
+export async function getPresignedUrl(
+  key: string,
+  expiresInSeconds = 3600,
+): Promise<string> {
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
 }
 
 /** Delete an object by key. */
 export async function deleteFromR2(key: string): Promise<void> {
   await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-}
-
-/** Build the public URL for a stored key. */
-export function r2PublicUrl(key: string): string {
-  return `${publicUrl}/${key}`;
 }
 
 export const R2_BUCKET = bucket;
@@ -67,12 +79,7 @@ function mimeToExt(mime: string): string {
 }
 
 /**
- * Upload an OCR image (base64 data URI) to R2 and return its public URL.
- * This replaces sending bulky base64 directly to the AI API — the model
- * receives a lightweight public URL instead, improving latency.
- *
- * The object key includes a UUID so scans don't collide.
- * Objects are stored under the "ocr/" prefix for easy lifecycle management.
+ * Upload an OCR image (base64 data URI) to R2 and return the object key.
  */
 export async function uploadOcrImage(dataUri: string): Promise<string> {
   const match = dataUri.match(/^data:(.*?);base64,(.*)$/);

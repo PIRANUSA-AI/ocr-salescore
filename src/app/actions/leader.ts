@@ -36,20 +36,21 @@ const ManualCustomerInputSchema = z.object({
     phone: z.string().optional(),
     company: z.string().optional(),
     jobTitle: z.string().optional(),
-    products: z.array(ProductSchema).optional(), // Can be empty or undefined
+    products: z.array(ProductSchema).optional(),
+    imageUrl: z.string().optional(),
+    imageKey: z.string().optional(),
 
-    // NEW acquisition context
     acquisitionContext: z.object({
         source: z.enum(CUSTOMER_SOURCES).default('Lainnya'),
         eventName: z.string().min(1, "Nama event/konteks wajib diisi."),
         eventDate: z.date({ required_error: "Tanggal event/interaksi wajib diisi." }),
     }),
 
-    notes: z.string().optional(), // Add notes field
-    assignedSalesId: z.string().optional().nullable(), // For Quick OCR, can be null
-    assignedSalesName: z.string().optional().nullable(), // For Quick OCR, can be null
-    creatorTeam: z.enum(['AEC', 'MFG']), // ADDED: To assign customer to a team
-    formAnswers: z.array(FormAnswerSchema).optional(), // Flexible form answers
+    notes: z.string().optional(),
+    assignedSalesId: z.string().optional().nullable(),
+    assignedSalesName: z.string().optional().nullable(),
+    creatorTeam: z.enum(['AEC', 'MFG']),
+    formAnswers: z.array(FormAnswerSchema).optional(),
 });
 
 
@@ -143,10 +144,9 @@ export async function createManualCustomer(input: z.infer<typeof ManualCustomerI
         throw new Error(firstError);
     }
 
-    const { name, email, phone, company, jobTitle, products, notes, assignedSalesId, assignedSalesName, creatorTeam, formAnswers, acquisitionContext } = validation.data;
+    const { name, email, phone, company, jobTitle, products, notes, assignedSalesId, assignedSalesName, creatorTeam, formAnswers, acquisitionContext, imageUrl, imageKey } = validation.data;
     const now = Timestamp.now();
 
-    // Data to be set or updated
     const customerData: Partial<Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>> = {
         name,
         phone: phone || '',
@@ -154,11 +154,13 @@ export async function createManualCustomer(input: z.infer<typeof ManualCustomerI
         jobTitle: jobTitle || '',
         assignedSalesId: assignedSalesId || null,
         assignedSalesName: assignedSalesName || null,
-        team: creatorTeam, // ADDED: Set the customer's team
+        team: creatorTeam,
         formAnswers: formAnswers || [],
+        imageUrl: imageUrl || '',
+        imageKey: imageKey || '',
         acquisitionContext: {
             ...acquisitionContext,
-            eventDate: acquisitionContext.eventDate.toISOString(), // Convert date to string
+            eventDate: acquisitionContext.eventDate.toISOString(),
         },
     };
 

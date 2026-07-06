@@ -1,12 +1,6 @@
 'use server';
 
-import { uploadToR2, deleteFromR2 } from '@/lib/r2';
-
-/**
- * Storage server actions (Cloudflare R2).
- * Clients send a base64 data URI; the server decodes & uploads to R2,
- * returning the public URL. Keeps R2 credentials server-side only.
- */
+import { uploadToR2, deleteFromR2, getPresignedUrl } from '@/lib/r2';
 
 function parseDataUri(dataUri: string): { buffer: Buffer; contentType: string } {
   const match = dataUri.match(/^data:([^;]+);base64,(.*)$/);
@@ -39,11 +33,37 @@ export async function uploadImageToR2(
   const ext = extFor(contentType);
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const key = `${folder}/${stamp}.${ext}`;
-  const url = await uploadToR2(buffer, key, contentType);
+  await uploadToR2(buffer, key, contentType);
+  const url = await getPresignedUrl(key);
   return { url, key };
 }
 
 export async function deleteR2Object(key: string): Promise<{ success: boolean }> {
   await deleteFromR2(key);
   return { success: true };
+}
+
+/**
+ * Upload an OCR image (base64 data URI) to R2 and return a presigned URL.
+ * Client calls this FIRST, gets the presigned URL, then sends the URL
+ * (not base64) to the analysis server action.
+ */
+/**
+ * Get a fresh presigned URL for an existing R2 object.
+ * Images stored with `imageKey` can be viewed at any time by calling this.
+ */
+export async function getR2PresignedUrl(key: string): Promise<{ url: string }> {
+  const url = await getPresignedUrl(key);
+  return { url };
+}
+
+export async function uploadOcrImageAction(
+  dataUri: string,
+): Promise<{ url: string; key: string }> {
+  const { buffer, contentType } = parseDataUri(dataUri);
+  const ext = extFor(contentType);
+  const key = `ocr/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  await uploadToR2(buffer, key, contentType);
+  const url = await getPresignedUrl(key);
+  return { url, key };
 }
