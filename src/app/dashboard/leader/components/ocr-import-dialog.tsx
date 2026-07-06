@@ -15,6 +15,7 @@ import { compressImageToDataUri } from '@/lib/image-compress';
 import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
@@ -55,6 +56,13 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
     const [eventName, setEventName] = useState('IBT 2026');
     const [readingStep, setReadingStep] = useState(0);
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+    const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
+
+    useEffect(() => {
+        if (userProfile?.team) {
+            setCreatorTeam(userProfile.team);
+        }
+    }, [userProfile]);
 
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +83,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         setFields({});
         setSalesCode('');
         setEventName('IBT 2026');
+        setCreatorTeam(userProfile?.team || 'AEC');
         setReadingStep(0);
         setHasCameraPermission(null);
         stopCamera();
@@ -228,7 +237,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                 phone: fields.phone?.trim() || '',
                 email: fields.email?.trim() || '',
                 address: fields.address?.trim() || '',
-                creatorTeam: (userProfile.team === 'MFG' ? 'MFG' : 'AEC'),
+                creatorTeam,
                 products: [],
                 assignedSalesId: null,
                 assignedSalesName: null,
@@ -345,6 +354,19 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                         {result && result.overriddenFields.length > 0 && (
                             <p className="text-xs text-muted-foreground">Beberapa field ditinjau ulang oleh AI pembanding.</p>
                         )}
+
+                        <div className="flex flex-col gap-1.5 p-3 border rounded-md bg-muted/20">
+                            <Label htmlFor="creatorTeam">Tim Pengguna <span className="text-red-500">*</span></Label>
+                            <Select value={creatorTeam} onValueChange={(val: any) => setCreatorTeam(val)} disabled={status === 'saving'}>
+                                <SelectTrigger id="creatorTeam">
+                                    <SelectValue placeholder="Pilih tim..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="AEC">AEC (Architecture)</SelectItem>
+                                    <SelectItem value="MFG">MFG (Manufacturing)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
 
                         <div className="flex flex-col gap-1.5">
                             <Label htmlFor="eventName">Nama Event / Acara <span className="text-red-500">*</span></Label>

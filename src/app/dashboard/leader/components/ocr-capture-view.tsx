@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { compressImageToDataUri } from '@/lib/image-compress';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import { createManualCustomer } from '@/app/actions/leader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
 import type { Customer } from '@/types';
@@ -41,7 +42,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [salesCode, setSalesCode] = useState<string>('');
-  const [eventName, setEventName] = useState('');
+  const [eventName, setEventName] = useState('IBT 2026');
+  const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
+
+  useEffect(() => {
+    if (userProfile?.team) {
+      setCreatorTeam(userProfile.team);
+    }
+  }, [userProfile]);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,9 +62,11 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     setResult(null);
     setFields({});
     setSalesCode('');
+    setEventName('IBT 2026');
+    setCreatorTeam(userProfile?.team || 'AEC');
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, []);
+  }, [userProfile]);
 
   const processImage = useCallback(async (dataUri: string) => {
     setStatus('reading');
@@ -139,7 +149,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         phone: fields.phone?.trim() || '',
         email: fields.email?.trim() || '',
         address: fields.address?.trim() || '',
-        creatorTeam: (userProfile.team === 'MFG' ? 'MFG' : 'AEC'),
+        creatorTeam,
         products: [],
         assignedSalesId: null,
         assignedSalesName: null,
@@ -253,6 +263,19 @@ export function OcrCaptureView({ recentCustomers }: Props) {
           )}
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5 p-3 border rounded-md bg-muted/20">
+            <Label htmlFor="creatorTeam">Tim Pengguna <span className="text-red-500">*</span></Label>
+            <Select value={creatorTeam} onValueChange={(val: any) => setCreatorTeam(val)} disabled={status === 'saving'}>
+              <SelectTrigger id="creatorTeam">
+                <SelectValue placeholder="Pilih tim..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AEC">AEC (Architecture)</SelectItem>
+                <SelectItem value="MFG">MFG (Manufacturing)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="eventName">Nama Event / Acara <span className="text-red-500">*</span></Label>
             <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Contoh: Pameran MFI 2026" disabled={status === 'saving'} />
