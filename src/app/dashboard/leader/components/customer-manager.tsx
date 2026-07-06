@@ -211,23 +211,23 @@ export const CustomerManager = () => {
             <EmailClientDialog isOpen={emailClientState.isOpen} onOpenChange={(open) => setEmailClientState({ isOpen: open, email: '' })} email={emailClientState.email} />
 
             {/* Header */}
-            <div className="flex items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-lg font-semibold tracking-tight">Customers</h1>
-                    <p className="text-xs text-muted-foreground">{customers?.length || 0} pelanggan terdaftar</p>
+            <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-base sm:text-lg font-semibold tracking-tight truncate">Customers</h1>
+                    <p className="text-xs text-muted-foreground">{customers?.length || 0} pelanggan</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setIsOcrDialogOpen(true)}>
-                        <ScanLine className="h-4 w-4 mr-1.5" />OCR
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setIsOcrDialogOpen(true)}>
+                        <ScanLine className="h-4 w-4" />
                     </Button>
                     <label className="cursor-pointer">
-                        <Button variant="outline" size="sm" disabled={isUploading} asChild>
-                            <span>{isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <PlusCircle className="h-4 w-4 mr-1.5" />}Import</span>
+                        <Button variant="outline" size="icon" className="h-8 w-8" disabled={isUploading} asChild>
+                            <span>{isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}</span>
                         </Button>
                         <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileUpload} />
                     </label>
-                    <Button size="sm" onClick={() => openCustomerEditDialog(null)}>
-                        <PlusCircle className="h-4 w-4 mr-1.5" />Tambah
+                    <Button size="icon" className="h-8 w-8" onClick={() => openCustomerEditDialog(null)}>
+                        <PlusCircle className="h-4 w-4" />
                     </Button>
                 </div>
             </div>
@@ -236,28 +236,24 @@ export const CustomerManager = () => {
 
             {/* Search & Filter */}
             <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Cari nama, perusahaan, telepon..." className="w-full pl-9 h-9 text-sm" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
+                <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input placeholder="Cari..." className="w-full pl-8 h-8 text-sm" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
                 </div>
                 <Select value={pipelineFilter} onValueChange={(v) => { setPipelineFilter(v); setCurrentPage(1); }}>
-                    <SelectTrigger className="w-[140px] h-9 text-xs">
+                    <SelectTrigger className="w-[110px] h-8 text-xs">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">Semua Status</SelectItem>
+                        <SelectItem value="all">Semua</SelectItem>
                         {PIPELINE_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                 </Select>
                 {isAnyFilterActive && (
-                    <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={resetFilters}>
-                        <X className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={resetFilters}>
+                        <X className="h-3.5 w-3.5" />
                     </Button>
                 )}
-                <Button variant="ghost" size="sm" className="text-xs gap-1.5" onClick={handleDownload}>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    Export
-                </Button>
             </div>
 
             {/* Bulk actions */}
@@ -288,28 +284,28 @@ export const CustomerManager = () => {
             {isMobile ? (
                 <div className="space-y-2">
                     {isLoading ? (
-                        [...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)
+                        [...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)
                     ) : paginatedCustomers.length > 0 ? (
                         paginatedCustomers.map(c => (
-                            <div key={c.id} className="p-3 border rounded-lg space-y-2">
+                            <div
+                                key={c.id}
+                                className="p-3 border rounded-lg active:bg-muted/50 transition-colors cursor-pointer"
+                                onClick={() => handleNavigateToDetail(c.id)}
+                            >
                                 <div className="flex items-start justify-between">
-                                    <div className="flex items-start gap-2">
-                                        <Checkbox className="mt-0.5" checked={selectedCustomers.includes(c.id)} onCheckedChange={(ch) => handleSelectRow(c.id, !!ch)} />
-                                        <div>
-                                            <div className="font-medium text-sm">{c.name}</div>
-                                            <div className="text-xs text-muted-foreground">{c.company || '-'}</div>
+                                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                                        <Checkbox className="mt-0.5 shrink-0" checked={selectedCustomers.includes(c.id)} onCheckedChange={(ch) => handleSelectRow(c.id, !!ch)} onClick={(e) => e.stopPropagation()} />
+                                        <div className="min-w-0">
+                                            <div className="font-medium text-sm truncate">{c.name}</div>
+                                            <div className="text-xs text-muted-foreground truncate">{c.company || '-'}</div>
                                         </div>
                                     </div>
-                                    <div className="flex gap-1">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleNavigateToDetail(c.id)}><Eye className="h-3.5 w-3.5" /></Button>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openCustomerEditDialog(c)}><Edit className="h-3.5 w-3.5" /></Button>
-                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 -mr-1" onClick={(e) => { e.stopPropagation(); openCustomerEditDialog(c); }}>
+                                        <Edit className="h-3.5 w-3.5" />
+                                    </Button>
                                 </div>
-                                <div className="flex items-center gap-2 pl-6">
-                                    <Select value={c.pipelineStatus} onValueChange={(v) => handleUpdatePipelineStatus(c.id, c.name, v as PipelineStatus)}>
-                                        <SelectTrigger className="h-7 text-[11px] w-[130px]"><SelectValue /></SelectTrigger>
-                                        <SelectContent>{PIPELINE_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                                    </Select>
+                                <div className="flex items-center gap-2 mt-1.5 ml-7">
+                                    <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{c.pipelineStatus}</span>
                                 </div>
                             </div>
                         ))
@@ -343,13 +339,17 @@ export const CustomerManager = () => {
                                 ))
                             ) : paginatedCustomers.length > 0 ? (
                                 paginatedCustomers.map(c => (
-                                    <TableRow key={c.id}>
-                                        <TableCell><Checkbox checked={selectedCustomers.includes(c.id)} onCheckedChange={(ch) => handleSelectRow(c.id, !!ch)} /></TableCell>
+                                    <TableRow
+                                        key={c.id}
+                                        className="cursor-pointer"
+                                        onClick={() => handleNavigateToDetail(c.id)}
+                                    >
+                                        <TableCell onClick={(e) => e.stopPropagation()}><Checkbox checked={selectedCustomers.includes(c.id)} onCheckedChange={(ch) => handleSelectRow(c.id, !!ch)} /></TableCell>
                                         <TableCell>
                                             <div className="font-medium text-sm">{c.name}</div>
                                             <div className="text-xs text-muted-foreground">{c.company || '-'}</div>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell onClick={(e) => e.stopPropagation()}>
                                             <Select value={c.pipelineStatus} onValueChange={(v) => handleUpdatePipelineStatus(c.id, c.name, v as PipelineStatus)}>
                                                 <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                                                 <SelectContent>{PIPELINE_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -361,13 +361,12 @@ export const CustomerManager = () => {
                                                 {phoneDisplay(c.phone)}
                                             </div>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell onClick={(e) => e.stopPropagation()}>
                                             <div className="flex gap-1">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleNavigateToDetail(c.id)}><Eye className="h-3.5 w-3.5" /></Button>
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openCustomerEditDialog(c)}><Edit className="h-3.5 w-3.5" /></Button>
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => e.stopPropagation()}><Trash2 className="h-3.5 w-3.5" /></Button>
                                                     </AlertDialogTrigger>
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader><AlertDialogTitle>Hapus {c.name}?</AlertDialogTitle><AlertDialogDescription>Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription></AlertDialogHeader>
