@@ -1,5 +1,5 @@
 import type { Timestamp } from 'firebase-admin/firestore';
-import type { WebinarAnalysis, WebinarAnalysisOutput } from "@/ai/flows/analyze-webinar-feedback";
+import type { WebinarAnalysisOutput } from "@/ai/flows/analyze-webinar-feedback";
 import type { TopicRecommendation } from "@/ai/flows/recommend-next-topic";
 import { z } from 'zod';
 

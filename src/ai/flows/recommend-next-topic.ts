@@ -1,13 +1,7 @@
-/**
- * @fileOverview This flow analyzes polling data from a Google Sheet and performs
- * external web research to recommend a strategic topic for the next webinar.
- */
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { callOpenAI } from '@/ai/openai-client';
 import { z } from 'zod';
-
-// -------- ZOD SCHEMAS --------
 
 const RecommendTopicInputSchema = z.object({
   pollData: z.string().describe("Raw CSV data string containing feedback and topic polls."),
@@ -15,7 +9,6 @@ const RecommendTopicInputSchema = z.object({
 });
 
 export type RecommendTopicInput = z.infer<typeof RecommendTopicInputSchema>;
-
 
 const TopicRecommendationSchema = z.object({
     topic: z.string().describe("Judul yang direkomendasikan untuk topik webinar selanjutnya."),
@@ -27,80 +20,42 @@ const TopicRecommendationsOutputSchema = z.object({
     recommendations: z.array(TopicRecommendationSchema),
 });
 
-
 export type TopicRecommendation = z.infer<typeof TopicRecommendationsOutputSchema>;
 
-// -------- GENKIT PROMPT --------
+export async function recommendNextTopic(input: RecommendTopicInput): Promise<TopicRecommendation> {
+    const { pollData, webinarTitle } = input;
 
-const recommendTopicPrompt = ai.definePrompt({
-   name: 'recommendTopicPrompt',
-   model: 'googleai/gemini-2.5-flash',
-   input: { schema: RecommendTopicInputSchema },
-   output: { schema: TopicRecommendationsOutputSchema },
-   prompt: `**PERAN UTAMA:**
-Anda adalah *AI Content Strategist* untuk PT PIRANUSA, distributor software CAD (ZWCAD, ZW3D, Archicad, Enscape, D5 Render). 
+    const systemPrompt = `Anda adalah AI Content Strategist untuk PT PIRANUSA, distributor software CAD (ZWCAD, ZW3D, Archicad, Enscape, D5 Render).
 
-**TUJUAN:**
-Menganalisis data feedback peserta (terutama kolom 'Saran Topik Berikutnya' atau 'Feedback') DAN melakukan pencarian Google untuk menemukan tren topik yang sedang *hype* di industri arsitektur, manufaktur, dan desain di Indonesia.
+TUGAS:
+1. Baca data polling feedback peserta.
+2. Gabungkan dengan pengetahuan tren industri arsitektur, manufaktur, dan desain di Indonesia.
+3. Hasilkan 5 rekomendasi topik webinar.
+4. Verifikasi nama software ditulis dengan benar.
 
-**TUGAS:**
-1.  Baca data JSON feedback peserta.
-2.  Lakukan Google Search untuk topik seperti 'tren software CAD 2025', 'webinar arsitektur populer Indonesia', 'topik ZWCAD terbaru', 'masalah umum desainer manufaktur'.
-3.  Gabungkan kedua sumber tersebut untuk menghasilkan **5 rekomendasi topik webinar**.
-4.  **Verifikasi Nama Software:** Pastikan nama software (ZWCAD, ZW3D, Archicad, Enscape, D5 Render) ditulis dengan benar jika muncul.
-5.  Hasil akhir HARUS berupa **satu objek JSON valid** dengan struktur di bawah.
+Output JSON dengan field "recommendations" (array of {topic, rationale, source}).`;
 
-**FORMAT OUTPUT (WAJIB JSON):**
-\`\`\`json
-{
-  "recommendations": [
-    {
-      "topic": "Judul Webinar yang Menarik dan Jelas",
-      "rationale": "Penjelasan singkat mengapa topik ini relevan (misal: 'Banyak peserta meminta topik X' atau 'Topik Y sedang tren di Google').",
-      "source": "Feedback Peserta" 
-    },
-    {
-      "topic": "Eksplorasi Fitur AI di ZWCAD 2026 untuk Arsitek",
-      "rationale": "Pencarian Google menunjukkan peningkatan minat pada 'AI di CAD' dan ini sejalan dengan rilis produk baru.",
-      "source": "Tren Web"
-    }
-  ]
-}
+    const userPrompt = `Informasi Kontekstual:
+- Judul Webinar Terakhir: ${webinarTitle}
+
+Data Polling Topik CSV:
+\`\`\`csv
+${pollData}
 \`\`\`
 
-**PERINTAH FINAL:**
-Keluaran Anda HARUS hanya berisi satu blok JSON valid. Jangan tambahkan teks lain di luar blok JSON.
+Berdasarkan data di atas dan tren industri saat ini, berikan 5 rekomendasi topik webinar untuk PT PIRANUSA.`;
 
-  **Informasi Kontekstual:**
-  -   Judul Webinar Terakhir: {{{webinarTitle}}}
-
-  **Data Polling Topik CSV (format bisa bervariasi):**
-  \`\`\`csv
-  {{{pollData}}}
-  \`\`\`
-  `,
-  });
-
-// -------- GENKIT FLOW --------
-
-const recommendNextTopicFlow = ai.defineFlow(
-  {
-    name: 'recommendNextTopicFlow',
-    inputSchema: RecommendTopicInputSchema,
-    outputSchema: TopicRecommendationsOutputSchema,
-  },
-  async (input) => {
-    const { output } = await recommendTopicPrompt(input);
+    const output = await callOpenAI({
+        systemPrompt,
+        userPrompt,
+        schema: TopicRecommendationsOutputSchema,
+        temperature: 0.4,
+        maxTokens: 1024,
+    });
 
     if (!output) {
-      throw new Error("AI gagal memberikan rekomendasi topik. Pastikan ada usulan topik di data Anda.");
+        throw new Error("AI gagal memberikan rekomendasi topik.");
     }
 
     return output;
-  }
-);
-
-
-export async function recommendNextTopic(input: RecommendTopicInput): Promise<TopicRecommendation> {
-    return recommendNextTopicFlow(input);
 }
