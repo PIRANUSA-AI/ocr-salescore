@@ -7,7 +7,6 @@
 
 import type { Customer, UserProfile, FollowUpTasks, RenewalTask, AftersalesTask, OpportunityTask, PipelineStatus, GenerationHistoryItem, Product, FormAnswer } from '@/types';
 import { z } from 'zod';
-import { ai } from '@/ai/genkit';
 import { adminDb } from '@/lib/firebase-admin'; // Use Admin SDK
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { PIPELINE_STAGES, PRODUCT_LIST } from '@/types';

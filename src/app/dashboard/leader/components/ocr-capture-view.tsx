@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronDown, AlertTriangle } from 'lucide-react';
+import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { compressImageToDataUri } from '@/lib/image-compress';
@@ -18,7 +19,7 @@ import type { Customer } from '@/types';
 
 const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
-type Status = 'collapsed' | 'idle' | 'reading' | 'result' | 'saving';
+type Status = 'idle' | 'reading' | 'result' | 'saving';
 
 const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: string }> = {
   high: { ring: 'border-green-500/40 bg-green-500/5', label: 'Yakin', text: 'text-green-600' },
@@ -29,16 +30,15 @@ const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: 
 
 interface Props {
   /** Recent OCR customers to show under the capture card. */
-  recentCustomers?: Customer[];
-  /** When true, starts collapsed showing just a button. Expands on click. */
-  collapsible?: boolean;
+  recentCustomers: Customer[];
 }
 
-export function OcrCaptureView({ recentCustomers = [], collapsible = false }: Props) {
+export function OcrCaptureView({ recentCustomers }: Props) {
   const { userProfile } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
-  const [status, setStatus] = useState<Status>(collapsible ? 'collapsed' : 'idle');
+  const [status, setStatus] = useState<Status>('idle');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -51,14 +51,14 @@ export function OcrCaptureView({ recentCustomers = [], collapsible = false }: Pr
   const recentThree = useMemo(() => recentCustomers.slice(0, 3), [recentCustomers]);
 
   const reset = useCallback(() => {
-    setStatus(collapsible ? 'collapsed' : 'idle');
+    setStatus('idle');
     setImagePreview(null);
     setResult(null);
     setFields({});
     setSalesCode('');
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [collapsible]);
+  }, []);
 
   const processImage = useCallback(async (dataUri: string) => {
     setStatus('reading');
@@ -166,31 +166,9 @@ export function OcrCaptureView({ recentCustomers = [], collapsible = false }: Pr
 
   // ============ RENDER ============
 
-  if (status === 'collapsed') {
-    return (
-      <Button
-        size="lg"
-        className="h-14 w-full text-base active:translate-y-px"
-        onClick={() => setStatus('idle')}
-      >
-        <ScanLine className="h-5 w-5 mr-2" /> Tambah Scan OCR
-      </Button>
-    );
-  }
-
   if (status === 'idle') {
     return (
-      <div className={collapsible ? "flex flex-col gap-3 w-full" : "flex flex-col gap-6 max-w-md mx-auto w-full"}>
-        {collapsible && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="self-end h-7 text-xs"
-            onClick={() => setStatus('collapsed')}
-          >
-            Tutup <ChevronDown className="h-3 w-3" />
-          </Button>
-        )}
+      <div className="flex flex-col gap-6 max-w-md mx-auto w-full">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -234,9 +212,14 @@ export function OcrCaptureView({ recentCustomers = [], collapsible = false }: Pr
           </CardContent>
         </Card>
 
-        {!collapsible && recentThree.length > 0 && (
+        {recentThree.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Hasil Terbaru</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Hasil Terbaru</h3>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.push('/dashboard?view=history')}>
+                Lihat Semua <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
             <div className="flex flex-col gap-2">
               {recentThree.map((c) => (
                 <RecentCard key={c.id} customer={c} />
@@ -263,14 +246,14 @@ export function OcrCaptureView({ recentCustomers = [], collapsible = false }: Pr
   }
 
   // status === 'result' || 'saving'
-  const fieldConfig: { key: string; label: string; conf: Confidence }[] = [
-    { key: 'name', label: 'Nama', conf: result?.name.confidence ?? 'high' },
-    { key: 'company', label: 'Perusahaan', conf: result?.company.confidence ?? 'high' },
-    { key: 'jobTitle', label: 'Jabatan', conf: result?.jobTitle.confidence ?? 'high' },
-    { key: 'division', label: 'Divisi', conf: result?.division.confidence ?? 'empty' },
-    { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high' },
-    { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high' },
-    { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high' },
+  const fieldConfig: { key: string; label: string; conf: Confidence; alternatives: string[] }[] = [
+    { key: 'name', label: 'Nama', conf: result?.name.confidence ?? 'high', alternatives: result?.name.alternatives ?? [] },
+    { key: 'company', label: 'Perusahaan', conf: result?.company.confidence ?? 'high', alternatives: result?.company.alternatives ?? [] },
+    { key: 'jobTitle', label: 'Jabatan', conf: result?.jobTitle.confidence ?? 'high', alternatives: result?.jobTitle.alternatives ?? [] },
+    { key: 'division', label: 'Divisi', conf: result?.division.confidence ?? 'empty', alternatives: result?.division.alternatives ?? [] },
+    { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high', alternatives: result?.phone.alternatives ?? [] },
+    { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high', alternatives: result?.email.alternatives ?? [] },
+    { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high', alternatives: result?.softwareNeeds.alternatives ?? [] },
   ];
 
   return (
@@ -316,9 +299,10 @@ export function OcrCaptureView({ recentCustomers = [], collapsible = false }: Pr
           </div>
 
           <div className="border-t pt-3 flex flex-col gap-2.5">
-            {fieldConfig.map(({ key, label, conf }) => {
+            {fieldConfig.map(({ key, label, conf, alternatives }) => {
               const style = CONFIDENCE_STYLE[conf];
               const needsCheck = conf === 'medium' || conf === 'low';
+              const hasAlt = alternatives.length > 0;
               return (
                 <div key={key} className={`flex flex-col gap-1 rounded-md border p-2 ${style.ring}`}>
                   <div className="flex items-center justify-between">
@@ -336,6 +320,20 @@ export function OcrCaptureView({ recentCustomers = [], collapsible = false }: Pr
                     disabled={status === 'saving'}
                     className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0"
                   />
+                  {hasAlt && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {alternatives.map((alt, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setFields((p) => ({ ...p, [key]: alt }))}
+                          className="text-[11px] px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
+                        >
+                          {alt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

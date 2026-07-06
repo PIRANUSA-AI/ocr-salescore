@@ -4,7 +4,6 @@
  */
 'use server';
 
-import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
 const CustomerOcrInputSchema = z.object({

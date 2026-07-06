@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { randomUUID } from 'crypto';
 
 /**
  * Cloudflare R2 storage client (S3-compatible).
@@ -51,3 +52,37 @@ export function r2PublicUrl(key: string): string {
 }
 
 export const R2_BUCKET = bucket;
+
+const OCR_PREFIX = 'ocr';
+
+/** Get file extension from a data URI mime type. */
+function mimeToExt(mime: string): string {
+  const map: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+  };
+  return map[mime] || 'jpg';
+}
+
+/**
+ * Upload an OCR image (base64 data URI) to R2 and return its public URL.
+ * This replaces sending bulky base64 directly to the AI API — the model
+ * receives a lightweight public URL instead, improving latency.
+ *
+ * The object key includes a UUID so scans don't collide.
+ * Objects are stored under the "ocr/" prefix for easy lifecycle management.
+ */
+export async function uploadOcrImage(dataUri: string): Promise<string> {
+  const match = dataUri.match(/^data:(.*?);base64,(.*)$/);
+  if (!match) {
+    throw new Error('Invalid data URI format');
+  }
+  const mime = match[1];
+  const base64 = match[2];
+  const ext = mimeToExt(mime);
+  const key = `${OCR_PREFIX}/${randomUUID()}.${ext}`;
+  const buffer = Buffer.from(base64, 'base64');
+  return uploadToR2(buffer, key, mime);
+}

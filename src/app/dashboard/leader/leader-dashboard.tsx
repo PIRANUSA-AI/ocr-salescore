@@ -10,6 +10,8 @@ import ReportPage from '../report/page';
 import MediaLibraryView from './views/media-library-view';
 import CompanyView from './views/company-view';
 import EmailBlastView from './views/email-blast-view';
+import OcrCaptureViewWrapper from './views/ocr-capture-view';
+import HistoryViewWrapper from './views/history-view';
 // import TodoView from './views/todo-view'; // Task-to-Do (MySQL) dinonaktifkan — fully Firebase
 
 
@@ -22,6 +24,10 @@ function LeaderDashboardContent({ activeView }: LeaderDashboardContentProps) {
 
   const renderContent = () => {
     switch (activeView) {
+      case 'ocr-capture':
+        return <OcrCaptureViewWrapper />;
+      case 'history':
+        return <HistoryViewWrapper />;
       case 'analysis':
         return <AnalysisView />;
       case 'tugas':
