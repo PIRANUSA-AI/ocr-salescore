@@ -24,7 +24,7 @@ const getInitials = (name: string) => {
     }
     return name.substring(0, 2).toUpperCase();
 };
-
+//
 export function ActivitySheet() {
     const [logs, setLogs] = useState<ActivityLog[]>([]);
     const [isLoading, setIsLoading] = useState(false);
