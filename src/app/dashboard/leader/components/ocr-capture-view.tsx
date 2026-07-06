@@ -195,13 +195,13 @@ export function OcrCaptureView({ recentCustomers }: Props) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Hasil Terbaru</h3>
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.push('/dashboard?view=history')}>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.push('/dashboard?view=customer-manager')}>
                 Lihat Semua <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
             <div className="flex flex-col gap-2">
               {recentThree.map((c) => (
-                <RecentCard key={c.id} customer={c} />
+                <RecentCard key={c.id} customer={c} onClick={() => router.push(`/dashboard/customer/${c.id}`)} />
               ))}
             </div>
           </div>
@@ -311,10 +311,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   );
 }
 
-function RecentCard({ customer }: { customer: Customer }) {
+function RecentCard({ customer, onClick }: { customer: Customer; onClick: () => void }) {
   const salesCode = customer.formAnswers?.find((qa) => qa.question.toLowerCase().includes('kode'))?.answer;
+  const timeAgo = customer.createdAt ? getTimeAgo(customer.createdAt) : '';
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card active:translate-y-px transition-transform">
+    <button
+      onClick={onClick}
+      className="flex items-center gap-3 p-3 rounded-lg border bg-card active:translate-y-px transition-all hover:border-primary/30 hover:shadow-sm w-full text-left cursor-pointer"
+    >
       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
         {salesCode || (customer.name?.slice(0, 2).toUpperCase() ?? '??')}
       </div>
@@ -322,6 +326,20 @@ function RecentCard({ customer }: { customer: Customer }) {
         <p className="text-sm font-medium truncate">{customer.name || '(tanpa nama)'}</p>
         <p className="text-xs text-muted-foreground truncate">{customer.company || customer.phone || '-'}</p>
       </div>
-    </div>
+      {timeAgo && <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo}</span>}
+      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+    </button>
   );
+}
+
+function getTimeAgo(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'baru saja';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m lalu`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}j lalu`;
+  const days = Math.floor(hours / 24);
+  return `${days}h lalu`;
 }

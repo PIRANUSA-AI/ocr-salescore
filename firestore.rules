@@ -47,5 +47,13 @@ service cloud.firestore {
     match /email_blasts/{blastId} {
       allow read, create: if request.auth != null;
     }
+
+    // Aturan untuk OCR Jobs
+    // - Pengguna terautentikasi bisa membaca jobs dari tim mereka.
+    // - Write dilakukan via Admin SDK di server action.
+    match /jobs/{jobId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }
