@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Search, Eye, Sparkles, PlusCircle, ScanLine, Edit, Trash2, Mail, Phone, ShieldAlert, Users, UserPlus, Send, MoreVertical, UserCheck } from 'lucide-react';
@@ -258,32 +258,25 @@ export const MyCustomersView = () => {
     if (isLoading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <Card><CardContent className="h-96 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></CardContent></Card>
-                <Card><CardContent className="h-96 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></CardContent></Card>
+                <div className="h-96 flex items-center justify-center border rounded-lg"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+                <div className="h-96 flex items-center justify-center border rounded-lg"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
             </div>
         )
     }
 
     if (!customers || customers.length === 0) {
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        Customers
-                        {!isLoading && (
-                            <Badge variant="default">{customers.length} Customers</Badge>
-                        )}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                    <p className='text-sm text-muted-foreground text-center py-10'>Anda belum memiliki pelanggan yang ditugaskan.</p>
-                </CardContent>
-            </Card>
+            <div className="space-y-4">
+                <h1 className="text-xl font-semibold tracking-tight">Customers</h1>
+                <div className="border rounded-lg p-12 text-center">
+                    <p className='text-sm text-muted-foreground'>Anda belum memiliki pelanggan yang ditugaskan.</p>
+                </div>
+            </div>
         );
     }
 
     return (
-        <FadeIn className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start h-full">
+        <FadeIn className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
             <OcrImportDialog
                 isOpen={isOcrDialogOpen}
                 onOpenChange={setIsOcrDialogOpen}
@@ -300,100 +293,94 @@ export const MyCustomersView = () => {
                 onOpenChange={(isOpen) => setEmailClientState({ isOpen, email: '' })}
                 email={emailClientState.email}
             />
-            <div className="overflow-x-auto">
-                <Card className="min-w-max">
-                    <CardHeader>
-                        <CardTitle className="font-headline text-3xl font-bold flex items-center gap-2">
-                            Customers
-                            {!isLoading && (
-                                <Badge variant="default">{customers.length} Customers</Badge>
+            <div className="flex items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-xl font-semibold tracking-tight">Customers</h1>
+                    <p className="text-sm text-muted-foreground">Kelola pelanggan yang ditugaskan kepada Anda.</p>
+                </div>
+                <div className='flex flex-wrap items-center gap-2 flex-shrink-0'>
+                    {selectedCustomers.length > 0 ? (
+                        <>
+                            <span className="text-sm font-medium text-muted-foreground">{selectedCustomers.length} dipilih</span>
+                            {userProfile && (
+                                <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="secondary" size="default">
+                                            <UserCheck className="mr-2 h-4 w-4" />
+                                            Tugaskan Sales
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Tugaskan Sales Massal</DialogTitle>
+                                            <DialogDescription>
+                                                Pilih sales untuk ditugaskan ke {selectedCustomers.length} deal yang dipilih.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="py-4">
+                                            <Select value={selectedSalesId} onValueChange={setSelectedSalesId}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Pilih Sales..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {salesTeam.map(s => (
+                                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>Batal</Button>
+                                            <Button onClick={executeBulkAssign} disabled={!selectedSalesId || isAssigning}>
+                                                {isAssigning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                                Simpan
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                             )}
-                        </CardTitle>
-                        <div className='flex flex-wrap items-start justify-between gap-4 pt-4'>
-                            <div className='relative flex-grow min-w-[200px]'>
-                                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                                <Input
-                                    placeholder='Cari pelanggan atau perusahaan...'
-                                    className='w-full pl-9'
-                                    value={searchTerm}
-                                    onChange={(e) => {
-                                        setSearchTerm(e.target.value);
-                                        setCurrentPage(1);
-                                    }}
-                                />
-                            </div>
-                            <div className='flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto flex-shrink-0'>
-                                {selectedCustomers.length > 0 ? (
-                                    <>
-                                        <span className="text-sm font-medium text-muted-foreground self-center">{selectedCustomers.length} dipilih</span>
-                                        {userProfile && (
-                                            <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="secondary" size="default" className="w-full sm:w-auto">
-                                                        <UserCheck className="mr-2 h-4 w-4" />
-                                                        Tugaskan Sales
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent>
-                                                    <DialogHeader>
-                                                        <DialogTitle>Tugaskan Sales Massal</DialogTitle>
-                                                        <DialogDescription>
-                                                            Pilih sales untuk ditugaskan ke {selectedCustomers.length} deal yang dipilih.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="py-4">
-                                                        <Select value={selectedSalesId} onValueChange={setSelectedSalesId}>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Pilih Sales..." />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {salesTeam.map(s => (
-                                                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <DialogFooter>
-                                                        <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>Batal</Button>
-                                                        <Button onClick={executeBulkAssign} disabled={!selectedSalesId || isAssigning}>
-                                                            {isAssigning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                                            Simpan
-                                                        </Button>
-                                                    </DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className='flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto'>
-                                        <Button type="button" variant="outline" onClick={() => setIsOcrDialogOpen(true)} size="default" className="w-full">
-                                            <ScanLine className="mr-2 h-4 w-4" />
-                                            OCR
-                                        </Button>
-                                        <Button type="button" onClick={() => openCustomerEditDialog(null)} size="default" className="w-full">
-                                            <PlusCircle className="mr-2 h-4 w-4" />
-                                            Tambah
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
+                        </>
+                    ) : (
+                        <div className='flex items-center gap-2'>
+                            <Button type="button" variant="outline" onClick={() => setIsOcrDialogOpen(true)} size="default">
+                                <ScanLine className="mr-2 h-4 w-4" />
+                                OCR
+                            </Button>
+                            <Button type="button" onClick={() => openCustomerEditDialog(null)} size="default">
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Tambah
+                            </Button>
                         </div>
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                        <div className="overflow-x-auto">
-                            {/* Mobile View */}
-                            <div className="md:hidden space-y-3">
-                                {isLoading ? (
-                                    <div className="text-center text-muted-foreground p-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>
-                                ) : paginatedCustomers.length > 0 ? (
-                                    paginatedCustomers.map(customer => {
-                                        const priority = getPriority(customer);
-                                        return (
-                                            <Card
-                                                key={customer.id}
-                                                onClick={() => handleCustomerSelectForAI(customer)}
-                                                className={cn("p-4 space-y-3 cursor-pointer", selectedCustomerForAI?.id === customer.id && 'ring-2 ring-primary border-primary')}
-                                            >
+                    )}
+                </div>
+            </div>
+
+            <div className='relative'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                <Input
+                    placeholder='Cari pelanggan atau perusahaan...'
+                    className='w-full pl-9'
+                    value={searchTerm}
+                    onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1);
+                    }}
+                />
+            </div>
+
+            {/* Mobile View */}
+            <div className="md:hidden space-y-3">
+                {isLoading ? (
+                    <div className="text-center text-muted-foreground p-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>
+                ) : paginatedCustomers.length > 0 ? (
+                    paginatedCustomers.map(customer => {
+                        const priority = getPriority(customer);
+                        return (
+                            <div
+                                key={customer.id}
+                                onClick={() => handleCustomerSelectForAI(customer)}
+                                className={cn("p-4 border rounded-lg space-y-3 cursor-pointer", selectedCustomerForAI?.id === customer.id && 'ring-2 ring-primary border-primary')}
+                            >
                                                 <div className="flex justify-between items-start">
                                                     <div className='flex items-start gap-3'>
                                                         <Checkbox
@@ -474,7 +461,7 @@ export const MyCustomersView = () => {
                                                         <Badge variant="secondary">{customer.pipelineStatus}</Badge>
                                                     </div>
                                                 </div>
-                                            </Card>
+                                            </div>
                                         )
                                     })
                                 ) : (
@@ -620,11 +607,7 @@ export const MyCustomersView = () => {
                                     setCurrentPage(1);
                                 }}
                             />
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-            <div className="sticky top-[8rem]">
+            <div className="lg:col-span-1">
                 {selectedCustomerForAI && userProfile ? (
                     <CommunicationGenerator
                         customer={selectedCustomerForAI}
@@ -632,13 +615,13 @@ export const MyCustomersView = () => {
                         onHookGenerated={handleHookGenerated}
                     />
                 ) : (
-                    <Card className="h-[500px] flex items-center justify-center">
-                        <CardContent className="text-center text-muted-foreground">
-                            <Sparkles className="mx-auto h-12 w-12" />
-                            <p className="mt-4 font-semibold">Pilih Pelanggan</p>
-                            <p className="text-sm">Pilih pelanggan dari tabel untuk memulai membuat pesan AI.</p>
-                        </CardContent>
-                    </Card>
+                    <div className="border rounded-lg h-[500px] flex items-center justify-center">
+                        <div className="text-center text-muted-foreground p-6">
+                            <Sparkles className="mx-auto h-8 w-8" />
+                            <p className="mt-3 font-semibold text-sm">Pilih Pelanggan</p>
+                            <p className="text-xs mt-1">Pilih pelanggan dari tabel untuk memulai membuat pesan AI.</p>
+                        </div>
+                    </div>
                 )}
             </div>
         </FadeIn>
