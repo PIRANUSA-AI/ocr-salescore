@@ -8,7 +8,7 @@ import { PIPELINE_STAGES } from '@/types';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { updatePipelineStatus } from '@/app/actions/sales';
 import { useAuth } from '@/hooks/use-auth';
-import { useDashboard } from './leader/context/dashboard-context';
+import { useDashboard } from './dashboard-context';
 import { User, Package, ChevronDown, Loader2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';

@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { PlusCircle, Download, Trash2, Users, Search, X, Filter, UserCheck, Loader2 } from "lucide-react";
-import { useDashboard } from "../leader/context/dashboard-context";
+import { useDashboard } from "../dashboard-context";
 import { useDebounce } from 'use-debounce';
 import {
     AlertDialog,

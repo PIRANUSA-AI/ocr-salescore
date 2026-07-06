@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type UpdateTask, PRODUCT_LIST, type ProductName } from '@/types';
-import { useDashboard } from '../context/dashboard-context';
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';

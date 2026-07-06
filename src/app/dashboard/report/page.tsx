@@ -1,27 +1,40 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { getReportData, type ReportData } from '@/app/actions/report';
 import { Loader2, Users, UserPlus, DollarSign, TrendingUp } from 'lucide-react';
-import { StatCard } from './stat-card';
+import { MetricCard } from '@/components/ui/metric-card';
+import { PageHeader } from '@/components/ui/page-header';
 import { RevenueTrendChart } from './revenue-trend-chart';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { FadeIn } from '@/components/ui/fade-in';
 import { AnalyticsExportButton } from '@/components/dashboard/analytics-export-button';
+import { motion } from 'framer-motion';
 
 const getInitials = (name: string) => {
   if (!name || name === 'Belum Ditugaskan') return '??';
   const names = name.split(' ');
-  if (names.length > 1) {
-    return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
-  }
+  if (names.length > 1) return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
   return name.substring(0, 2).toUpperCase();
 };
 
+function Skeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-28 rounded-lg bg-muted" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 h-80 rounded-lg bg-muted" />
+        <div className="h-80 rounded-lg bg-muted" />
+      </div>
+    </div>
+  );
+}
 
 export default function ReportPage() {
   const { userProfile } = useAuth();
@@ -36,121 +49,108 @@ export default function ReportPage() {
         .then(setData)
         .catch((err) => {
           console.error(err);
-          setError('Gagal memuat data laporan. Silakan coba lagi nanti.');
+          setError('Gagal memuat data laporan.');
         })
         .finally(() => setIsLoading(false));
     }
   }, [userProfile]);
 
   const calculateChange = (current: number, previous: number) => {
-    if (previous === 0) {
-      return current > 0 ? 100 : 0;
-    }
+    if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[60vh] w-full items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="text-center text-destructive">{error}</div>;
-  }
-
-  if (!data) {
-    return <div className="text-center text-muted-foreground">Tidak ada data untuk ditampilkan.</div>;
-  }
+  if (isLoading) return <Skeleton />;
+  if (error) return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error}</div>;
+  if (!data) return <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">Tidak ada data untuk ditampilkan.</div>;
 
   const { stats, salesDistribution } = data;
   const totalCustomersForDistribution = salesDistribution.reduce((acc, curr) => acc + curr.customerCount, 0);
 
+  const formatCurrency = (v: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
   return (
-    <FadeIn className="w-full space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight">Analytics Report</h2>
+    <FadeIn className="space-y-6">
+      <PageHeader title="Laporan" description="Analisis kinerja tim dan kesehatan bisnis">
         <AnalyticsExportButton data={data} />
-      </div>
-      {/* Top Stats Cards */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+      </PageHeader>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
+      >
+        <MetricCard
           title="Total Pelanggan"
-          value={stats.totalCustomers}
-          icon={<Users className="h-4 w-4 text-muted-foreground" />}
+          value={stats.totalCustomers.toLocaleString('id-ID')}
+          icon={<Users className="h-4 w-4" />}
           change={calculateChange(stats.totalCustomers, stats.totalCustomersLastMonth)}
           changeLabel="dari bulan lalu"
-          description="Jumlah total pelanggan yang terdaftar di dalam sistem untuk tim Anda."
         />
-        <StatCard
+        <MetricCard
           title="Pelanggan Baru (Hari Ini)"
-          value={stats.newCustomersToday}
-          icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
+          value={stats.newCustomersToday.toLocaleString('id-ID')}
+          icon={<UserPlus className="h-4 w-4" />}
           change={calculateChange(stats.newCustomersToday, stats.newCustomersYesterday)}
           changeLabel="dari kemarin"
-          description="Jumlah pelanggan baru yang ditambahkan dalam 24 jam terakhir."
         />
-        <StatCard
-          title="Total Revenue (Won)"
-          value={stats.totalRevenue}
-          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-          format="currency"
+        <MetricCard
+          title="Total Revenue"
+          value={formatCurrency(stats.totalRevenue)}
+          icon={<DollarSign className="h-4 w-4" />}
           change={calculateChange(stats.totalRevenue, stats.totalRevenueLastMonth)}
           changeLabel="dari bulan lalu"
-          description="Total pendapatan dari semua deal yang berhasil dimenangkan (status 'Won')."
         />
-        <StatCard
+        <MetricCard
           title="Deal Dimenangkan (Hari Ini)"
-          value={stats.wonDealsToday}
-          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-          description="Jumlah deal yang statusnya diubah menjadi 'Won' dalam 24 jam terakhir."
+          value={stats.wonDealsToday.toLocaleString('id-ID')}
+          icon={<TrendingUp className="h-4 w-4" />}
         />
-      </div>
+      </motion.div>
 
-      {/* Main Chart and Distribution Cards */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Revenue Trend Chart */}
-        <div className="lg:col-span-2 rounded-xl border bg-card text-card-foreground shadow-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-3"
+      >
+        <div className="lg:col-span-2 rounded-lg border bg-card p-4 lg:p-6">
           <RevenueTrendChart data={data.revenueTrend} />
         </div>
 
-        {/* Sales Distribution */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="font-headline text-3xl font-bold w-fit">Distribusi Pelanggan</CardTitle>
-            <CardDescription>
-              Jumlah pelanggan yang ditangani oleh setiap anggota tim sales.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {salesDistribution.length > 0 ? (
-              salesDistribution.map((sales) => {
-                const percentage = totalCustomersForDistribution > 0 ? (sales.customerCount / totalCustomersForDistribution) * 100 : 0;
-                return (
-                  <div key={sales.salesId || 'unassigned'} className="space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6 text-xs">
-                          <AvatarFallback>{getInitials(sales.salesName)}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{sales.salesName}</span>
-                      </div>
-                      <span className="text-muted-foreground">{sales.customerCount} pelanggan</span>
+        <div className="rounded-lg border bg-card p-4 lg:p-6">
+          <h3 className="text-sm font-semibold">Distribusi Pelanggan</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Jumlah pelanggan per anggota tim sales.</p>
+          <div className="mt-4 space-y-3">
+            {salesDistribution.length > 0 ? salesDistribution.map((sales, i) => {
+              const percentage = totalCustomersForDistribution > 0 ? (sales.customerCount / totalCustomersForDistribution) * 100 : 0;
+              return (
+                <motion.div
+                  key={sales.salesId || 'unassigned'}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 + i * 0.05 }}
+                  className="space-y-1.5"
+                >
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-5 w-5">
+                        <AvatarFallback className="text-[10px]">{getInitials(sales.salesName)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium">{sales.salesName}</span>
                     </div>
-                    <Progress value={percentage} aria-label={`${percentage.toFixed(0)}%`} />
+                    <span className="text-xs text-muted-foreground">{sales.customerCount}</span>
                   </div>
-                );
-              })
-            ) : (
-              <p className='text-sm text-center text-muted-foreground py-4'>Tidak ada data distribusi sales.</p>
+                  <Progress value={percentage} className="h-1.5" />
+                </motion.div>
+              );
+            }) : (
+              <p className="py-4 text-center text-sm text-muted-foreground">Tidak ada data.</p>
             )}
-          </CardContent>
-        </Card>
-      </div>
-
+          </div>
+        </div>
+      </motion.div>
     </FadeIn>
   );
 }

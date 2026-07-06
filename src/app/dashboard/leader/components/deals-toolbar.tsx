@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Download, Trash2, Users, Search, X, Filter } from "lucide-react";
-import { useDashboard } from "../context/dashboard-context";
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { useDebounce } from 'use-debounce';
 import {
   AlertDialog,

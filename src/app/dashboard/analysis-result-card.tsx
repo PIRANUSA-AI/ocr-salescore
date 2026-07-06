@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Star, Lightbulb, TrendingUp, CheckCircle, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
 import { type WebinarAnalysisOutput, type TopicRecommendation, type AnalysisHistoryEntry } from "@/types";
-import { useDashboard } from "./leader/context/dashboard-context";
+import { useDashboard } from "./dashboard-context";
 import { Button } from "@/components/ui/button";
 
 interface AnalysisResultCardProps {

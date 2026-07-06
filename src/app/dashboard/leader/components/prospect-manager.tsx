@@ -14,7 +14,7 @@ import { id } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { useDashboard } from '../context/dashboard-context';
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { AnalysisDetailDialog } from './analysis-detail-dialog';
 import { FeedbackDetailDialog } from './feedback-detail-dialog';
 import { AnalysisHistoryEntry } from '@/types';

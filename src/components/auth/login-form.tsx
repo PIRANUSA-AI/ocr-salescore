@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; // Pastikan pakai next/navigation untuk App Router
+import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,18 +13,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { loginLocal, signupLocal } from '@/app/actions/auth-local';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { handleSignupAction } from '@/app/actions/auth';
-import { CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-  FieldSet,
-} from "@/components/ui/field"
 
-// --- ZOD SCHEMAS ---
 const loginSchema = z.object({
   email: z.string().email({ message: 'Email tidak valid.' }),
   password: z.string().min(6, { message: 'Minimal 6 karakter.' }),
@@ -60,11 +52,7 @@ const superadminSignupSchema = z.object({
 const signupSchema = z.union([leaderSignupSchema, salesSignupSchema, superadminSignupSchema]);
 type SignupFormData = z.infer<typeof signupSchema>;
 
-// When Firebase is not configured we run MySQL-backed auth (local mode).
 const AUTH_MODE = process.env.NEXT_PUBLIC_AUTH_MODE || 'local';
-
-
-
 
 interface LoginFormProps {
   isSignup: boolean;
@@ -72,7 +60,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
-  const router = useRouter(); // <--- Tambahkan ini
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { refreshLocalSession } = useAuth();
@@ -85,12 +73,8 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
   const signupForm = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-      role: 'Sales',
-      team: undefined,
-      specialKey: undefined,
+      name: '', email: '', password: '',
+      role: 'Sales', team: undefined, specialKey: undefined,
     } as any,
   });
 
@@ -126,11 +110,9 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
         router.push('/dashboard');
         return;
       }
-
       await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({ title: "Login Berhasil", description: "Mengalihkan ke dasbor..." });
       router.push('/dashboard');
-
     } catch (error: any) {
       handleAuthError(error as AuthError);
       setIsLoading(false);
@@ -142,17 +124,14 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
     const result =
       AUTH_MODE === 'local'
         ? await signupLocal({
-            name: data.name,
-            email: data.email,
-            password: data.password,
-            role: data.role,
-            team: data.team,
+            name: data.name, email: data.email, password: data.password,
+            role: data.role, team: data.team,
           })
         : await handleSignupAction(data);
     setIsLoading(false);
     if (result.success) {
       toast({ title: 'Pendaftaran Berhasil', description: 'Silakan masuk untuk melanjutkan.' });
-      setIsSignup(false); // Switch to login form
+      setIsSignup(false);
     } else {
       toast({ variant: 'destructive', title: 'Pendaftaran Gagal', description: result.error });
     }
@@ -160,133 +139,89 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
 
   const watchedRole = signupForm.watch('role');
 
+  if (isSignup) {
+    return (
+      <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="signup-name">Nama Lengkap</Label>
+          <Input id="signup-name" placeholder="Nama Anda" {...signupForm.register('name')} disabled={isLoading} />
+          {signupForm.formState.errors.name && <p className="text-xs text-destructive">{signupForm.formState.errors.name.message}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="signup-email">Email</Label>
+          <Input id="signup-email" type="email" placeholder="nama@contoh.com" {...signupForm.register('email')} disabled={isLoading} />
+          {signupForm.formState.errors.email && <p className="text-xs text-destructive">{signupForm.formState.errors.email.message}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="signup-password">Kata Sandi</Label>
+          <Input id="signup-password" type="password" {...signupForm.register('password')} disabled={isLoading} />
+          {signupForm.formState.errors.password && <p className="text-xs text-destructive">{signupForm.formState.errors.password.message}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label>Peran</Label>
+          <Controller
+            control={signupForm.control}
+            name="role"
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+                <SelectTrigger><SelectValue placeholder="Pilih peran..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Sales">Sales</SelectItem>
+                  <SelectItem value="Leader">Leader</SelectItem>
+                  <SelectItem value="Superadmin">Superadmin</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Tim</Label>
+          <Controller
+            control={signupForm.control}
+            name="team"
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+                <SelectTrigger><SelectValue placeholder="Pilih tim..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AEC">AEC (Architecture)</SelectItem>
+                  <SelectItem value="MFG">MFG (Manufacturing)</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {signupForm.formState.errors.team && <p className="text-xs text-destructive">{signupForm.formState.errors.team.message}</p>}
+        </div>
+        {(watchedRole === 'Leader' || watchedRole === 'Superadmin') && (
+          <div className="space-y-1.5">
+            <Label htmlFor="specialKey">Kunci Rahasia</Label>
+            <Input id="specialKey" type="password" {...signupForm.register('specialKey')} disabled={isLoading} />
+            {(signupForm.formState.errors as any).specialKey && <p className="text-xs text-destructive">{(signupForm.formState.errors as any).specialKey?.message}</p>}
+          </div>
+        )}
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Daftar
+        </Button>
+      </form>
+    );
+  }
+
   return (
-    <>
-      {isSignup ? (
-        // --- SIGNUP FORM ---
-        <>
-          <CardHeader suppressHydrationWarning>
-            <CardTitle>Buat Akun</CardTitle>
-            <CardDescription>Isi detail di bawah untuk membuat akun baru.</CardDescription>
-          </CardHeader>
-          <form onSubmit={signupForm.handleSubmit(handleSignup)} suppressHydrationWarning>
-            <CardContent suppressHydrationWarning>
-              <FieldSet>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="signup-name">Nama Lengkap</FieldLabel>
-                    <Input id="signup-name" placeholder="Nama Anda" {...signupForm.register('name')} disabled={isLoading} />
-                    {signupForm.formState.errors.name && <p className="text-xs text-destructive">{signupForm.formState.errors.name.message}</p>}
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="signup-email">Email</FieldLabel>
-                    <Input id="signup-email" type="email" placeholder="nama@contoh.com" {...signupForm.register('email')} disabled={isLoading} />
-                    {signupForm.formState.errors.email && <p className="text-xs text-destructive">{signupForm.formState.errors.email.message}</p>}
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="signup-password">Kata Sandi</FieldLabel>
-                    <Input id="signup-password" type="password" {...signupForm.register('password')} disabled={isLoading} />
-                    {signupForm.formState.errors.password && <p className="text-xs text-destructive">{signupForm.formState.errors.password.message}</p>}
-                  </Field>
-                  <Field>
-                    <FieldLabel>Peran</FieldLabel>
-                    <Controller
-                      control={signupForm.control}
-                      name="role"
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih peran Anda..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Sales">Sales</SelectItem>
-                            <SelectItem value="Leader">Leader</SelectItem>
-                            <SelectItem value="Superadmin">Superadmin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel>Tim</FieldLabel>
-                    <Controller
-                      control={signupForm.control}
-                      name="team"
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih tim Anda..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="AEC">AEC (Architecture)</SelectItem>
-                            <SelectItem value="MFG">MFG (Manufacturing)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {signupForm.formState.errors.team && <p className="text-xs text-destructive">{signupForm.formState.errors.team.message}</p>}
-                  </Field>
-                  {(watchedRole === 'Leader' || watchedRole === 'Superadmin') && (
-                    <Field>
-                      <FieldLabel htmlFor="specialKey">Kunci Rahasia</FieldLabel>
-                      <Input id="specialKey" type="password" {...signupForm.register('specialKey')} disabled={isLoading} />
-                      {(signupForm.formState.errors as any).specialKey && <p className="text-xs text-destructive">{(signupForm.formState.errors as any).specialKey?.message}</p>}
-                    </Field>
-                  )}
-                </FieldGroup>
-              </FieldSet>
-            </CardContent>
-            <CardFooter className="flex-col gap-4" suppressHydrationWarning>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Daftar
-              </Button>
-              <p className="text-sm text-center text-muted-foreground">
-                Sudah punya akun?{' '}
-                <button type="button" onClick={() => setIsSignup(false)} className="font-semibold text-primary hover:underline focus:outline-none">
-                  Masuk
-                </button>
-              </p>
-            </CardFooter>
-          </form>
-        </>
-      ) : (
-        // --- LOGIN FORM ---
-        <form onSubmit={loginForm.handleSubmit(handleLogin)} suppressHydrationWarning>
-          <CardHeader suppressHydrationWarning>
-            <CardTitle>Masuk</CardTitle>
-            <CardDescription>Masukkan email dan kata sandi Anda untuk melanjutkan.</CardDescription>
-          </CardHeader>
-          <CardContent suppressHydrationWarning>
-            <FieldSet>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="login-email">Email</FieldLabel>
-                  <Input id="login-email" type="email" placeholder="nama@contoh.com" {...loginForm.register('email')} disabled={isLoading} />
-                  {loginForm.formState.errors.email && <p className="text-xs text-destructive">{loginForm.formState.errors.email.message}</p>}
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="login-password">Kata Sandi</FieldLabel>
-                  <Input id="login-password" type="password" {...loginForm.register('password')} disabled={isLoading} />
-                  {loginForm.formState.errors.password && <p className="text-xs text-destructive">{loginForm.formState.errors.password.message}</p>}
-                </Field>
-              </FieldGroup>
-            </FieldSet>
-          </CardContent>
-          <CardFooter className="flex-col gap-4" suppressHydrationWarning>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Masuk
-            </Button>
-            <p className="text-sm text-center text-muted-foreground">
-              Belum punya akun?{' '}
-              <button type="button" onClick={() => setIsSignup(true)} className="font-semibold text-primary hover:underline focus:outline-none">
-                Daftar
-              </button>
-            </p>
-          </CardFooter>
-        </form>
-      )}
-    </>
+    <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="login-email">Email</Label>
+        <Input id="login-email" type="email" placeholder="nama@contoh.com" {...loginForm.register('email')} disabled={isLoading} />
+        {loginForm.formState.errors.email && <p className="text-xs text-destructive">{loginForm.formState.errors.email.message}</p>}
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="login-password">Kata Sandi</Label>
+        <Input id="login-password" type="password" {...loginForm.register('password')} disabled={isLoading} />
+        {loginForm.formState.errors.password && <p className="text-xs text-destructive">{loginForm.formState.errors.password.message}</p>}
+      </div>
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Masuk
+      </Button>
+    </form>
   );
 }

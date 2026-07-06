@@ -1,6 +1,6 @@
 'use client';
 
-import { useDashboard } from '../context/dashboard-context';
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { OcrHistoryView } from '../components/ocr-history-view';
 
 /**

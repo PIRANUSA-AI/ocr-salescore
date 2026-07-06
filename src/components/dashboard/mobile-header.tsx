@@ -1,12 +1,11 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { LogOut, ScanLine } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { logoutLocal } from '@/app/actions/auth-local';
-import { useState, useEffect } from 'react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,19 +22,6 @@ import { Logo } from '@/components/icons/logo';
 export function MobileHeader() {
     const { userProfile } = useAuth();
     const router = useRouter();
-    const [isScrolled, setIsScrolled] = useState(false);
-
-    useEffect(() => {
-        const mainContent = document.getElementById('dashboard-main');
-        if (!mainContent) return;
-
-        const handleScroll = () => {
-            setIsScrolled(mainContent.scrollTop > 10);
-        };
-
-        mainContent.addEventListener('scroll', handleScroll);
-        return () => mainContent.removeEventListener('scroll', handleScroll);
-    }, []);
 
     const handleLogout = async () => {
         if ((process.env.NEXT_PUBLIC_AUTH_MODE || 'local') === 'local') {
@@ -56,52 +42,48 @@ export function MobileHeader() {
     };
 
     return (
-        <header
-            className={`sticky top-0 z-30 flex h-14 items-center justify-between px-4 transition-all duration-200
-            ${isScrolled
-                    ? 'bg-background/80 backdrop-blur-md shadow-sm border-b'
-                    : 'bg-transparent'
-                }`}
-        >
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur-md px-4">
             <Logo width={100} height={26} />
 
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="secondary" size="icon" className="rounded-full shadow-sm shrink-0">
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={userProfile?.photoURL ?? ''} alt={userProfile?.name} />
-                            <AvatarFallback className="bg-primary text-primary-foreground">
-                                {getInitials(userProfile?.name)}
-                            </AvatarFallback>
-                        </Avatar>
-                        <span className="sr-only">Toggle user menu</span>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>
-                        <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-medium leading-none">{userProfile?.name}</p>
-                            <p className="text-xs leading-none text-muted-foreground">
-                                {userProfile?.email}
-                            </p>
-                        </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <div className='flex gap-2 px-2 py-1.5'>
-                        <Badge variant="outline">{userProfile?.role}</Badge>
-                        {userProfile?.team && <Badge variant="secondary">{userProfile?.team}</Badge>}
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
-                        Pengaturan
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Keluar</span>
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
+                    <ScanLine className="h-4 w-4" />
+                    Pindai
+                </Button>
+
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="rounded-full">
+                            <Avatar className="h-7 w-7">
+                                <AvatarImage src={userProfile?.photoURL ?? ''} alt={userProfile?.name} />
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                                    {getInitials(userProfile?.name)}
+                                </AvatarFallback>
+                            </Avatar>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel>
+                            <div className="flex flex-col gap-1">
+                                <p className="text-sm font-medium">{userProfile?.name}</p>
+                                <div className="flex gap-1.5">
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">{userProfile?.role}</Badge>
+                                    {userProfile?.team && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{userProfile?.team}</Badge>}
+                                </div>
+                            </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
+                            Pengaturan
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Keluar
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </header>
     );
 }

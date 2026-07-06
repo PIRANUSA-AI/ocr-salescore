@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useDashboard } from '../context/dashboard-context';
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 import KanbanBoard from '../../kanban-board';
 import { CustomerEditDialog } from '../components/customer-edit-dialog';
 import { DealsToolbar } from '../components/deals-toolbar';

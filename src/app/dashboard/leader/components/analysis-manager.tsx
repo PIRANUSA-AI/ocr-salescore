@@ -8,7 +8,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Loader2, Sparkles, FileUp, XCircle, Eye } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { useDashboard } from '../context/dashboard-context';
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { FadeIn } from '@/components/ui/fade-in';
 import {
     Dialog,

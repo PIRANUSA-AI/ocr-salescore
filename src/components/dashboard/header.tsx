@@ -1,12 +1,11 @@
 "use client";
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { PanelLeft, LogOut, Settings } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { LogOut, Settings, PanelLeft } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { logoutLocal } from '@/app/actions/auth-local';
-import { useState, useEffect } from 'react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,22 +26,6 @@ export function DashboardHeader() {
     const { user, userProfile } = useAuth();
     const { toggleSidebar } = useSidebar();
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const view = searchParams.get('view');
-    const isComplexView = view === 'deals' || view === 'sales-assistant';
-    const [isScrolled, setIsScrolled] = useState(false);
-
-    useEffect(() => {
-        const mainContent = document.getElementById('dashboard-main');
-        if (!mainContent) return;
-
-        const handleScroll = () => {
-            setIsScrolled(mainContent.scrollTop > 10);
-        };
-
-        mainContent.addEventListener('scroll', handleScroll);
-        return () => mainContent.removeEventListener('scroll', handleScroll);
-    }, []);
 
     const handleLogout = async () => {
         if ((process.env.NEXT_PUBLIC_AUTH_MODE || 'local') === 'local') {
@@ -63,66 +46,57 @@ export function DashboardHeader() {
     };
 
     return (
-        <header
-            className={`absolute top-0 right-0 left-0 z-30 flex h-14 items-center gap-4 px-6 lg:h-[72px] lg:px-8 transition-all duration-200 
-            ${isScrolled || isComplexView
-                    ? 'bg-background/80 backdrop-blur-md shadow-sm border-b'
-                    : 'bg-transparent'
-                }`}
-        >
+        <header className="flex h-14 items-center gap-3 border-b bg-background/95 px-4 lg:h-16 lg:px-6">
             <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                className="shrink-0 md:hidden bg-background/50"
+                className="shrink-0 md:hidden"
                 onClick={toggleSidebar}
             >
                 <PanelLeft className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation menu</span>
             </Button>
-            <div className="w-full flex-1 flex items-center justify-between gap-2">
-                <div className="flex-1 max-w-md">
+
+            <div className="flex flex-1 items-center justify-between gap-3">
+                <div className="max-w-md flex-1">
                     <GlobalSearch />
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-1.5">
                     <NotificationBell />
                     {(userProfile?.role === 'Leader' || userProfile?.role === 'Superadmin') && (
                         <ActivitySheet />
                     )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="secondary" size="icon" className="rounded-full shadow-sm">
-                                <Avatar className="h-8 w-8">
+                            <Button variant="ghost" size="icon" className="rounded-full">
+                                <Avatar className="h-7 w-7">
                                     <AvatarImage src={userProfile?.photoURL ?? ''} alt={userProfile?.name} />
-                                    <AvatarFallback className="bg-primary text-primary-foreground">
+                                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
                                         {getInitials(userProfile?.name)}
                                     </AvatarFallback>
                                 </Avatar>
-                                <span className="sr-only">Toggle user menu</span>
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuLabel>
-                                <div className="flex flex-col space-y-1">
-                                    <p className="text-sm font-medium leading-none">{userProfile?.name}</p>
-                                    <p className="text-xs leading-none text-muted-foreground">
-                                        {userProfile?.email}
-                                    </p>
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-sm font-medium">{userProfile?.name}</p>
+                                    <div className="flex gap-1.5">
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{userProfile?.role}</Badge>
+                                        {userProfile?.team && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{userProfile?.team}</Badge>}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">{userProfile?.email}</p>
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <div className='flex gap-2 px-2 py-1.5'>
-                                <Badge variant="outline">{userProfile?.role}</Badge>
-                                {userProfile?.team && <Badge variant="secondary">{userProfile?.team}</Badge>}
-                            </div>
-                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
                                 <Settings className="mr-2 h-4 w-4" />
-                                <span>Pengaturan</span>
+                                Pengaturan
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={handleLogout}>
                                 <LogOut className="mr-2 h-4 w-4" />
-                                <span>Keluar</span>
+                                Keluar
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { CommunicationGenerator } from './communication-generator';
 import { useAuth } from '@/hooks/use-auth';
-import { useDashboard } from '../leader/context/dashboard-context';
+import { useDashboard } from '../dashboard-context';
 import { OcrImportDialog } from '../leader/components/ocr-import-dialog';
 import { ExcelPreviewDialog } from '../leader/components/excel-preview-dialog';
 import { useToast } from '@/hooks/use-toast';

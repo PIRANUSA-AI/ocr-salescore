@@ -1,30 +1,28 @@
 import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { AuthWrapper } from '@/components/providers/auth-wrapper';
 
+const geist = Geist({
+  subsets: ['latin'],
+  variable: '--font-geist',
+});
+
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  variable: '--font-geist-mono',
+});
+
 export const metadata: Metadata = {
-  title: 'SalesCore',
-  description:
-    'Aplikasi CRM cerdas untuk memberdayakan tim sales Anda dengan analisis AI dan manajemen prospek yang efisien.',
+  title: 'SalesCore - CRM & Sales Intelligence',
+  description: 'Aplikasi CRM cerdas untuk memberdayakan tim sales dengan analisis AI dan manajemen prospek yang efisien.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className={cn('font-body antialiased bg-background')} suppressHydrationWarning>
+      <body className={cn(geist.variable, geistMono.variable, 'font-sans antialiased bg-background')} suppressHydrationWarning>
         <AuthWrapper>{children}</AuthWrapper>
       </body>
     </html>

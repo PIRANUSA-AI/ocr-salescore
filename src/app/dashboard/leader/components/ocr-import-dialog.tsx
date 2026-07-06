@@ -12,7 +12,7 @@ import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
 import { createManualCustomer } from '@/app/actions/leader';
 import { compressImageToDataUri } from '@/lib/image-compress';
-import { useDashboard } from '../context/dashboard-context';
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 

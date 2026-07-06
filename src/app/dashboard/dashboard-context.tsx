@@ -12,7 +12,6 @@ import type { WebinarAnalysisInput, WebinarAnalysisResult } from '@/app/actions/
 import { endOfDay, startOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
-
 type AnalysisDisplayResult = Extract<WebinarAnalysisResult, { success: true }>;
 
 interface DashboardContextType {
@@ -41,7 +40,6 @@ interface DashboardContextType {
   closeCustomerEditDialog: () => void;
   handleUpdateCustomer: (customerData: any) => Promise<void>;
   handleCreateCustomer: (customerData: any) => Promise<void>;
-  // New state and handlers for Deals View
   dealsFilters: { search: string; salesId: string; dateRange: DateRange | null; };
   setDealsFilters: React.Dispatch<React.SetStateAction<{ search: string; salesId: string; dateRange: DateRange | null; }>>;
   handleBulkDelete: (customerIds: string[]) => Promise<void>;
@@ -70,7 +68,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
 
   const [editDialogState, setEditDialogState] = useState<{ isOpen: boolean, customer: Customer | null }>({ isOpen: false, customer: null });
 
-  // State for Deals filters
   const [dealsFilters, setDealsFilters] = useState<{ search: string; salesId: string; dateRange: DateRange | null; }>({ search: '', salesId: 'all', dateRange: null });
 
   const fetchFastData = useCallback(async () => {
@@ -90,13 +87,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
 
       const customersPromise = userProfile.role === 'Leader'
         ? getAllCustomers().then(allCustomers => allCustomers.filter(c => {
-          // Leader should see customers if:
-          // 1. Customer belongs to their team explicitly
-          // 2. OR Customer is assigned to a sales rep in their team
           const isTeamMatch = c.team === userProfile.team;
           const teamSalesIds = formattedSales.map(s => s.id);
           const isAssignedToTeam = c.assignedSalesId && teamSalesIds.includes(c.assignedSalesId);
-
           return isTeamMatch || isAssignedToTeam;
         }))
         : getAssignedCustomers(user.uid);
@@ -134,7 +127,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       if (logsResult.status === 'fulfilled') {
         setActivityLogs(logsResult.value as ActivityLog[]);
       }
-
     } catch (error) {
       console.error("[DashboardContext] Failed to fetch initial data:", error);
       toast({ variant: 'destructive', title: 'Gagal Memuat Data', description: (error as Error).message });
@@ -143,23 +135,17 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [toast, user, userProfile]);
 
-
   const runAiTasks = useCallback(async () => {
     if (!user || !userProfile) return;
     setIsAiTaskLoading(true);
     try {
       const opportunityTasks = await runAndSaveAiOpportunityTasks();
-
       const salesTeamForFilter = salesTeam.length > 0 ? salesTeam : (await getSalesUsers().then(users => users.filter(u => u.team === userProfile.team)));
       const teamSalesIds = salesTeamForFilter.map(s => s.uid);
-
       const customersForFilter = customers.length > 0 ? customers : (await getAllCustomers().then(allCustomers => allCustomers.filter(c => !c.assignedSalesId || teamSalesIds.includes(c.assignedSalesId!))));
       const customerIdsOfTeam = new Set(customersForFilter.map(c => c.id));
-
       const filteredOpportunityTasks = opportunityTasks.filter(t => customerIdsOfTeam.has(t.customerId));
-
       setTasks(prev => ({ ...prev, opportunity: filteredOpportunityTasks }));
-
       toast({ title: 'Analisis AI Selesai', description: 'Tugas peluang baru telah dibuat berdasarkan data pelanggan terakhir.' });
     } catch (error) {
       console.error("[DashboardContext] Failed to fetch AI tasks:", error);
@@ -172,13 +158,11 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const filteredCustomers = customers.filter(customer => {
     const searchMatch = dealsFilters.search.trim() === '' || customer.name.toLowerCase().includes(dealsFilters.search.toLowerCase()) || (customer.company || '').toLowerCase().includes(dealsFilters.search.toLowerCase()) || (customer.email || '').toLowerCase().includes(dealsFilters.search.toLowerCase());
     const salesMatch = dealsFilters.salesId === 'all' || customer.assignedSalesId === dealsFilters.salesId || (dealsFilters.salesId === 'unassigned' && !customer.assignedSalesId);
-
     let dateMatch = true;
     if (dealsFilters.dateRange?.from && dealsFilters.dateRange?.to) {
       const customerDate = new Date(customer.updatedAt);
       dateMatch = customerDate >= startOfDay(dealsFilters.dateRange.from) && customerDate <= endOfDay(dealsFilters.dateRange.to);
     }
-
     return searchMatch && salesMatch && dateMatch;
   });
 
@@ -192,7 +176,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, userProfile, fetchFastData]);
 
-
   const handleAssignSalesToEntity = async (entityId: string, salesId: string, salesName: string, entityType: 'customer' | 'task') => {
     try {
       await assignSalesToEntity(entityId, salesId, salesName, entityType);
@@ -204,7 +187,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleDeleteAnalyses = async (analysisIds: string[]) => {
-    setIsDeletingAnalysis(true); // Set loading to true
+    setIsDeletingAnalysis(true);
     try {
       await deleteAnalysis(analysisIds);
       toast({ title: 'Sukses', description: `${analysisIds.length} riwayat analisis berhasil dihapus.` });
@@ -212,7 +195,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       toast({ variant: 'destructive', title: 'Gagal Menghapus', description: (error as Error).message });
     } finally {
-      setIsDeletingAnalysis(false); // Set loading to false
+      setIsDeletingAnalysis(false);
     }
   }
 
@@ -233,25 +216,12 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       const result = await analyzeWebinar(input);
       if (result.success) {
         refreshAllData();
-        toast({
-          title: 'Analisis Dimulai',
-          description: 'Data sedang diproses. Hasilnya akan segera muncul di tab Riwayat Analisis.',
-          duration: 6000,
-        });
+        toast({ title: 'Analisis Dimulai', description: 'Data sedang diproses. Hasilnya akan segera muncul di tab Riwayat Analisis.', duration: 6000 });
       } else {
-        toast({
-          variant: 'destructive',
-          title: 'Analisis Gagal',
-          description: result.error,
-          duration: 8000,
-        });
+        toast({ variant: 'destructive', title: 'Analisis Gagal', description: result.error, duration: 8000 });
       }
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Analisis Gagal',
-        description: error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui di sisi klien.',
-      });
+      toast({ variant: 'destructive', title: 'Analisis Gagal', description: error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui di sisi klien.' });
     } finally {
       setIsAnalysisLoading(false);
     }
@@ -276,11 +246,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(result.error);
       }
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Gagal Membuat Rekomendasi',
-        description: (error as Error).message,
-      });
+      toast({ variant: 'destructive', title: 'Gagal Membuat Rekomendasi', description: (error as Error).message });
     } finally {
       setIsTopicLoading(null);
     }
@@ -297,25 +263,18 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       if (result.success && result.insights) {
         toast({ title: 'Sukses', description: 'Ringkasan webinar berhasil dibuat oleh AI.' });
         const newInsights = result.insights;
-
         const updateState = (prev: AnalysisHistoryEntry[]): AnalysisHistoryEntry[] =>
           prev.map(item =>
             item.id === analysisId
               ? { ...item, insightsGenerated: true, analysis: { ...item.analysis, insights: newInsights } }
               : item
           );
-
         setAnalysisHistory(updateState);
-
       } else {
         throw new Error(result.error || "Gagal mendapatkan ringkasan dari AI.");
       }
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Gagal Membuat Ringkasan',
-        description: (error as Error).message,
-      });
+      toast({ variant: 'destructive', title: 'Gagal Membuat Ringkasan', description: (error as Error).message });
     } finally {
       setIsInsightsLoading(null);
     }
@@ -340,12 +299,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       refreshAllData();
       closeCustomerEditDialog();
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Gagal Memperbarui Pelanggan',
-        description: error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui.',
-      });
-      throw error; // Re-throw to keep the dialog open
+      toast({ variant: 'destructive', title: 'Gagal Memperbarui Pelanggan', description: error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui.' });
+      throw error;
     }
   };
 
@@ -360,16 +315,10 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       refreshAllData();
       closeCustomerEditDialog();
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Gagal Menambahkan Pelanggan',
-        description: error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui.',
-      });
-      throw error; // Re-throw to keep the dialog open
+      toast({ variant: 'destructive', title: 'Gagal Menambahkan Pelanggan', description: error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui.' });
+      throw error;
     }
   };
-
-  // --- New Bulk Action Handlers ---
 
   const handleBulkDelete = async (customerIds: string[]) => {
     try {
@@ -378,7 +327,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       refreshAllData();
     } catch (error) {
       toast({ variant: 'destructive', title: 'Gagal Hapus Massal', description: (error as Error).message });
-      throw error; // re-throw to be caught by component
+      throw error;
     }
   };
 
@@ -392,7 +341,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: 'destructive', title: 'Sales Tidak Valid' });
       return;
     }
-
     try {
       await Promise.all(customerIds.map(id => assignSalesToEntity(id, newSalesId, sales.name, 'customer')));
       toast({ title: 'Sukses', description: `${customerIds.length} deal berhasil ditugaskan ke ${sales.name}.` });
@@ -402,38 +350,14 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-
   const value: DashboardContextType = {
-    customers,
-    filteredCustomers,
-    salesTeam,
-    tasks,
-    analysisHistory,
-    activityLogs,
-    isLoading,
-    isAiTaskLoading,
-    isAnalysisLoading,
-    isDeletingAnalysis,
-    isTopicLoading,
-    isInsightsLoading,
-    refreshAllData,
-    runAiTasks,
-    handleAssignSalesToEntity,
-    handleDeleteAnalyses,
-    handleAssignProspects,
-    handleStartAnalysis,
-    handleGenerateTopics,
-    handleGenerateInsights,
-    editDialogState,
-    openCustomerEditDialog,
-    closeCustomerEditDialog,
-    handleUpdateCustomer,
-    handleCreateCustomer,
-    dealsFilters,
-    setDealsFilters,
-    handleBulkDelete,
-    handleBulkAssign,
-    userProfile,
+    customers, filteredCustomers, salesTeam, tasks, analysisHistory, activityLogs,
+    isLoading, isAiTaskLoading, isAnalysisLoading, isDeletingAnalysis, isTopicLoading, isInsightsLoading,
+    refreshAllData, runAiTasks,
+    handleAssignSalesToEntity, handleDeleteAnalyses, handleAssignProspects, handleStartAnalysis,
+    handleGenerateTopics, handleGenerateInsights,
+    editDialogState, openCustomerEditDialog, closeCustomerEditDialog, handleUpdateCustomer, handleCreateCustomer,
+    dealsFilters, setDealsFilters, handleBulkDelete, handleBulkAssign, userProfile,
   };
 
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;

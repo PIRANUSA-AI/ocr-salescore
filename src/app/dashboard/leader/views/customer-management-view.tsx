@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CustomerManager } from '../components/customer-manager';
 import { CustomerEditDialog } from '../components/customer-edit-dialog';
-import { useDashboard } from '../context/dashboard-context';
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 
 export default function CustomerManagementView() {
   const {
