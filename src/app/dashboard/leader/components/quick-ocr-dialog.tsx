@@ -1,23 +1,19 @@
-
-
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, UploadCloud, Camera, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getUploadUrl } from '@/app/actions/storage';
 import { extractCustomerFromForm } from '@/ai/flows/extract-customer-from-form';
 import { createManualCustomer } from '@/app/actions/leader';
 import { getAssignableUsers } from '@/app/actions/user';
-import { compressImageToDataUri, dataUriToBlob } from '@/lib/image-compress';
+import { compressImageToDataUri } from '@/lib/image-compress';
 import type { UserProfile, CustomerSource } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -30,7 +26,6 @@ const FormAnswerSchema = z.object({
 
 const OCR_INTERACTION_SOURCES: CustomerSource[] = ['Pameran', 'Workshop', 'Visit', 'Training', 'Troubleshoot', 'Lainnya', 'OCR'];
 
-
 const QuickOcrSchema = z.object({
     name: z.string().optional(),
     email: z.string().email('Email tidak valid.').optional().or(z.literal('')),
@@ -40,16 +35,13 @@ const QuickOcrSchema = z.object({
     assignedSalesId: z.string({ required_error: "Anda harus memilih nama Anda." }),
     creatorTeam: z.enum(['AEC', 'MFG'], { required_error: "Tim pengguna harus ditentukan." }),
     formAnswers: z.array(FormAnswerSchema).optional(),
-
     acquisitionContext: z.object({
         source: z.enum(OCR_INTERACTION_SOURCES as [string, ...string[]]),
         eventName: z.string().min(1, "Nama/Konteks Acara wajib diisi."),
         eventDate: z.date({ required_error: "Tanggal interaksi wajib diisi." }),
     }),
-
     notes: z.string().optional(),
 });
-
 
 type FormData = z.infer<typeof QuickOcrSchema>;
 
@@ -62,7 +54,6 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     const [status, setStatus] = useState<'idle' | 'reading' | 'mapping' | 'saving' | 'camera'>('idle');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [ocrImageUrl, setOcrImageUrl] = useState<string>('');
-    const [ocrImageKey, setOcrImageKey] = useState<string>('');
     const [assignableUsers, setAssignableUsers] = useState<UserProfile[]>([]);
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
@@ -73,9 +64,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
 
     const form = useForm<FormData>({
         resolver: zodResolver(QuickOcrSchema),
-        defaultValues: {
-            formAnswers: [],
-        }
+        defaultValues: { formAnswers: [] }
     });
 
     const { fields: formAnswerFields, replace: replaceFormAnswers } = useFieldArray({
@@ -94,30 +83,21 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
         setStatus('idle');
         setImagePreview(null);
         setOcrImageUrl('');
-        setOcrImageKey('');
         stopCamera();
         form.reset();
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) { fileInputRef.current.value = ''; }
     }, [form, stopCamera]);
 
     const handleClose = () => {
         if (status === 'saving') return;
         onOpenChange(false);
         setTimeout(resetState, 300);
-    }
+    };
 
     const processImage = useCallback(async (imageDataUri: string) => {
         try {
             const compressed = await compressImageToDataUri(imageDataUri);
-            const contentType = 'image/jpeg';
-            const { uploadUrl, key } = await getUploadUrl(contentType);
-            const blob = dataUriToBlob(compressed);
-            const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: blob });
-            if (!uploadRes.ok) throw new Error('Gagal upload gambar ke Cloudflare R2.');
-            setOcrImageKey(key);
-            const result = await extractCustomerFromForm({ imageKey: key });
+            const result = await extractCustomerFromForm({ imageDataUri: compressed });
             setImagePreview(result._fullResult?.imageUrl || '');
             setOcrImageUrl(result._fullResult?.imageUrl || '');
 
@@ -150,10 +130,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
-
         setStatus('reading');
         setImagePreview(URL.createObjectURL(file));
-
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onloadend = async () => {
@@ -179,11 +157,10 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
             context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
             const imageDataUri = canvas.toDataURL('image/jpeg');
             setImagePreview(imageDataUri);
-            stopCamera(); // Stop camera after capture
+            stopCamera();
             processImage(imageDataUri);
         }
     };
-
 
     const onSubmit = async (data: FormData) => {
         const selectedUser = assignableUsers.find(s => s.uid === data.assignedSalesId);
@@ -191,9 +168,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
             toast({ variant: 'destructive', title: 'Error', description: 'Pengguna yang dipilih tidak valid.' });
             return;
         }
-
         setStatus('saving');
-
         const isLeaderAssigningToSelf = selectedUser.role === 'Leader';
         try {
             await createManualCustomer({
@@ -201,7 +176,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 name: data.name || '',
                 creatorTeam: data.creatorTeam,
                 imageUrl: ocrImageUrl,
-                imageKey: ocrImageKey,
+                imageKey: '',
                 acquisitionContext: {
                     ...data.acquisitionContext,
                     source: data.acquisitionContext.source as any
@@ -210,7 +185,6 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 assignedSalesName: isLeaderAssigningToSelf ? null : selectedUser.name,
                 notes: data.notes,
             });
-
             toast({ title: 'Sukses!', description: `Pelanggan "${data.name}" berhasil dibuat.` });
             handleClose();
         } catch (error) {
@@ -229,15 +203,10 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 toast({ variant: 'destructive', title: 'Gagal Memuat Pengguna', description: 'Tidak dapat memuat daftar sales dan leader.' });
             });
         }
-
         if (isOpen && status === 'camera') {
             const getCameraPermission = async () => {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: 'environment',
-                        }
-                    });
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
                     setHasCameraPermission(true);
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
@@ -249,14 +218,10 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 }
             };
             getCameraPermission();
-
         } else {
             stopCamera();
         }
-
-        return () => {
-            stopCamera();
-        }
+        return () => { stopCamera(); };
     }, [isOpen, status, stopCamera, toast]);
 
     const handleUserChange = (userId: string) => {
@@ -275,9 +240,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                         {hasCameraPermission === false ? (
                             <Alert variant="destructive">
                                 <AlertTitle>Akses Kamera Ditolak</AlertTitle>
-                                <AlertDescription>
-                                    Izinkan akses kamera di pengaturan browser Anda untuk menggunakan fitur ini.
-                                </AlertDescription>
+                                <AlertDescription>Izinkan akses kamera di pengaturan browser Anda untuk menggunakan fitur ini.</AlertDescription>
                             </Alert>
                         ) : (
                             <>
@@ -326,7 +289,6 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                         <form id="quick-ocr-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 overflow-y-auto max-h-[60vh] pr-2">
                             <p className="text-sm text-muted-foreground col-span-full">Verifikasi hasil pindaian AI, isi konteks, dan pilih nama Anda sebagai pemilik kontak ini.</p>
 
-                            {/* --- New Acquisition Context Fields --- */}
                             <div className="p-3 border rounded-md space-y-2 bg-muted/20">
                                 <h4 className="font-medium text-sm">Konteks Akuisisi</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -364,9 +326,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                             <div>
                                 <Label htmlFor="assignedSalesId">Nama Anda (Pemilik Kontak)</Label>
                                 <Select onValueChange={handleUserChange} defaultValue={form.getValues('assignedSalesId')}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Pilih nama Anda..." />
-                                    </SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder="Pilih nama Anda..." /></SelectTrigger>
                                     <SelectContent>
                                         {assignableUsers.map(s => <SelectItem key={s.uid} value={s.uid}>{s.name} ({s.role})</SelectItem>)}
                                     </SelectContent>
@@ -405,11 +365,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                                 {formAnswerFields.map((field, index) => (
                                     <div key={field.id} className="space-y-1">
                                         <Label htmlFor={`form-q-${index}`} className="text-xs text-muted-foreground">{field.question}</Label>
-                                        <Input
-                                            id={`form-q-${index}`}
-                                            {...form.register(`formAnswers.${index}.answer`)}
-                                            disabled={status === 'saving'}
-                                        />
+                                        <Input id={`form-q-${index}`} {...form.register(`formAnswers.${index}.answer`)} disabled={status === 'saving'} />
                                     </div>
                                 ))}
                                 {formAnswerFields.length === 0 && <p className="text-xs text-center text-muted-foreground py-2 border rounded-md">Tidak ada jawaban form yang terdeteksi.</p>}
@@ -426,15 +382,13 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 <DialogHeader>
                     <DialogTitle>Pindai Cepat</DialogTitle>
                     <DialogDescription>
-                        Unggah gambar, pilih nama Anda, dan kontak akan langsung dibuat. Jika Anda seorang Leader, kontak akan masuk ke daftar "Belum Ditugaskan".
+                        Unggah gambar, pilih nama Anda, dan kontak akan langsung dibuat.
                     </DialogDescription>
                 </DialogHeader>
-
                 <div className="py-4 pr-3 overflow-y-auto" style={{ maxHeight: '75vh' }}>
                     <canvas ref={canvasRef} className="hidden" />
                     {renderContent()}
                 </div>
-
                 <DialogFooter>
                     {status !== 'idle' && status !== 'camera' && (
                         <Button type="button" variant="ghost" onClick={resetState} disabled={status === 'saving' || status === 'reading'}>Pindai Lagi</Button>

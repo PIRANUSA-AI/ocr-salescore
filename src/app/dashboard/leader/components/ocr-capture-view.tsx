@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import Image from 'next/image';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,8 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { compressImageToDataUri, dataUriToBlob } from '@/lib/image-compress';
-import { getUploadUrl } from '@/app/actions/storage';
+import { compressImageToDataUri } from '@/lib/image-compress';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import { createManualCustomer } from '@/app/actions/leader';
 import type { ExtractResult } from '@/lib/ocr/extract';
@@ -30,7 +28,6 @@ const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: 
 };
 
 interface Props {
-  /** Recent OCR customers to show under the capture card. */
   recentCustomers: Customer[];
 }
 
@@ -41,7 +38,6 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
   const [status, setStatus] = useState<Status>('idle');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [ocrImageKey, setOcrImageKey] = useState<string>('');
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [salesCode, setSalesCode] = useState<string>('');
@@ -55,7 +51,6 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const reset = useCallback(() => {
     setStatus('idle');
     setImagePreview(null);
-    setOcrImageKey('');
     setResult(null);
     setFields({});
     setSalesCode('');
@@ -66,15 +61,11 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const processImage = useCallback(async (dataUri: string) => {
     setStatus('reading');
     try {
+      // Step 1: Compress client-side → smaller base64 for server action
       const compressed = await compressImageToDataUri(dataUri);
-      const contentType = 'image/jpeg';
-      const { uploadUrl, key } = await getUploadUrl(contentType);
-      const blob = dataUriToBlob(compressed);
-      const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: blob });
-      if (!uploadRes.ok) throw new Error('Gagal upload gambar ke Cloudflare R2.');
-      setOcrImageKey(key);
-      const res = await extractCustomerVision({ imageKey: key });
-      setImagePreview(res.imageUrl || '');
+      // Step 2: Upload to R2 + AI analyze (server-side, one call)
+      const res = await extractCustomerVision({ imageDataUri: compressed });
+      setImagePreview(res.imageUrl || compressed);
       setResult(res);
       setFields({
         name: res.name.value,
@@ -96,7 +87,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     }
   }, [toast, reset]);
 
-  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>, fromCamera: boolean) => {
+  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -106,7 +97,6 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       processImage(dataUri);
     };
     reader.readAsDataURL(file);
-    void fromCamera;
   };
 
   const onSave = async () => {
@@ -153,7 +143,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         assignedSalesName: null,
         notes: `Kode sales: ${salesCode}`,
         imageUrl: result?.imageUrl || '',
-        imageKey: ocrImageKey,
+        imageKey: '',
         acquisitionContext: {
           source: 'OCR',
           eventName: eventName.trim(),
@@ -164,7 +154,6 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
       toast({ title: 'Tersimpan', description: `Kontak ${fields.name} berhasil ditambahkan.` });
       reset();
-      // Trigger a refresh of the dashboard data so the new entry appears.
       window.location.reload();
     } catch (err) {
       toast({
@@ -188,36 +177,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <Button
-              size="lg"
-              className="h-20 text-base active:translate-y-px"
-              onClick={() => cameraInputRef.current?.click()}
-            >
+            <Button size="lg" className="h-20 text-base active:translate-y-px" onClick={() => cameraInputRef.current?.click()}>
               <Camera className="h-6 w-6 mr-3" /> Foto Langsung
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-14 active:translate-y-px"
-              onClick={() => fileInputRef.current?.click()}
-            >
+            <Button size="lg" variant="outline" className="h-14 active:translate-y-px" onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-5 w-5 mr-2" /> Unggah Gambar
             </Button>
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => onFileSelected(e, true)}
-            />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => onFileSelected(e, false)}
-            />
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFileSelected(e)} />
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFileSelected(e)} />
             <p className="text-xs text-muted-foreground text-center pt-1">
               Foto kartu nama atau form customer. AI akan mengekstrak datanya.
             </p>
@@ -249,7 +216,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="text-muted-foreground text-center">AI sedang membaca gambar...</p>
         {imagePreview && (
-          <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-muted">
+          <div className="w-full aspect-video rounded-lg overflow-hidden border bg-muted">
             <img src={imagePreview} alt="Pratinjau" className="w-full h-full object-contain" />
           </div>
         )}
@@ -257,7 +224,6 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     );
   }
 
-  // status === 'result' || 'saving'
   const fieldConfig: { key: string; label: string; conf: Confidence; alternatives: string[] }[] = [
     { key: 'name', label: 'Nama', conf: result?.name.confidence ?? 'high', alternatives: result?.name.alternatives ?? [] },
     { key: 'company', label: 'Perusahaan', conf: result?.company.confidence ?? 'high', alternatives: result?.company.alternatives ?? [] },
@@ -271,7 +237,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   return (
     <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
       {imagePreview && (
-        <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-muted">
+        <div className="w-full aspect-video rounded-lg overflow-hidden border bg-muted">
           <img src={imagePreview} alt="Pratinjau" className="w-full h-full object-contain" />
         </div>
       )}
@@ -280,9 +246,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Verifikasi & Lengkapi Data</CardTitle>
           {result && result.overriddenFields.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Beberapa field ditinjau ulang oleh AI pembanding.
-            </p>
+            <p className="text-xs text-muted-foreground">Beberapa field ditinjau ulang oleh AI pembanding.</p>
           )}
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -295,15 +259,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             <Label htmlFor="salesCode">Kode Tim Sales <span className="text-red-500">*</span></Label>
             <div className="grid grid-cols-4 gap-2">
               {SALES_CODES.map((code) => (
-                <Button
-                  key={code}
-                  type="button"
-                  variant={salesCode === code ? 'default' : 'outline'}
-                  size="sm"
-                  className="active:translate-y-px"
-                  disabled={status === 'saving'}
-                  onClick={() => setSalesCode(code)}
-                >
+                <Button key={code} type="button" variant={salesCode === code ? 'default' : 'outline'} size="sm" className="active:translate-y-px" disabled={status === 'saving'} onClick={() => setSalesCode(code)}>
                   {code}
                 </Button>
               ))}
@@ -325,22 +281,11 @@ export function OcrCaptureView({ recentCustomers }: Props) {
                       </span>
                     )}
                   </div>
-                  <Input
-                    id={key}
-                    value={fields[key] || ''}
-                    onChange={(e) => setFields((p) => ({ ...p, [key]: e.target.value }))}
-                    disabled={status === 'saving'}
-                    className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0"
-                  />
+                  <Input id={key} value={fields[key] || ''} onChange={(e) => setFields((p) => ({ ...p, [key]: e.target.value }))} disabled={status === 'saving'} className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0" />
                   {hasAlt && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {alternatives.map((alt, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setFields((p) => ({ ...p, [key]: alt }))}
-                          className="text-[11px] px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
-                        >
+                        <button key={i} type="button" onClick={() => setFields((p) => ({ ...p, [key]: alt }))} className="text-[11px] px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
                           {alt}
                         </button>
                       ))}

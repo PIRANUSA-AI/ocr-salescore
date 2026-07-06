@@ -1,44 +1,41 @@
 'use server';
 
 import { extractCustomer, type ExtractResult } from '@/lib/ocr/extract';
-import { getObjectAsDataUri, getPresignedUrl } from '@/lib/r2';
+import { uploadOcrImage, getPresignedUrl } from '@/lib/r2';
 
 export type { ExtractResult } from '@/lib/ocr/extract';
 
 /**
- * Analyze an image that has already been uploaded to R2.
+ * OCR flow: upload image to R2, then analyze.
  *
- * Flow:
- * 1. Client uploads directly to R2 via presigned PUT → gets `imageKey`
- * 2. Client calls this with the key
- * 3. Server fetches the image from R2, converts to base64,
- *    and passes it to the AI pipeline (no presigned URL dependency).
+ * 1. Client compresses the image and sends base64 data URI
+ * 2. Server uploads to R2 (S3 SDK, no CORS issues)
+ * 3. Server generates presigned URL for AI + display
+ * 4. AI primary (gpt-4.1) fetches from presigned URL
+ * 5. AI verifier (gpt-5-nano) reviews text only — no image
  */
 export async function extractCustomerVision(input: {
-  imageKey: string;
+  imageDataUri: string;
   alwaysSecondOpinion?: boolean;
 }): Promise<ExtractResult> {
-  if (!input?.imageKey) {
-    throw new Error('Key gambar tidak boleh kosong. Upload gambar ke R2 terlebih dahulu.');
+  if (!input?.imageDataUri) {
+    throw new Error('Gambar tidak boleh kosong.');
   }
 
-  console.log('[OCR] Fetching from R2 key:', input.imageKey);
+  // Step 1: Upload to R2 (server-side, S3 SDK)
+  const key = await uploadOcrImage(input.imageDataUri);
+  console.log('[OCR] R2 upload OK → key:', key);
 
+  // Step 2: Generate presigned URL for AI + display (lightweight)
+  const imageUrl = await getPresignedUrl(key, 1800);
+
+  // Step 3: Analyze — primary gets presigned URL, verifier gets text only
   try {
-    // Fetch image from R2 server-side → base64 data URI
-    const dataUri = await getObjectAsDataUri(input.imageKey);
-
-    const result = await extractCustomer(dataUri, {
+    const result = await extractCustomer(imageUrl, {
       alwaysSecondOpinion: input.alwaysSecondOpinion,
     });
-
-    // Generate a fresh presigned URL so the client can display the image
-    const viewUrl = await getPresignedUrl(input.imageKey);
-    result.imageUrl = viewUrl;
-
-    console.log(
-      `[OCR] done in ${result.elapsedMs}ms, key: ${input.imageKey}`,
-    );
+    result.imageUrl = imageUrl;
+    console.log(`[OCR] done in ${result.elapsedMs}ms`);
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Gagal mengekstrak data dari gambar.';

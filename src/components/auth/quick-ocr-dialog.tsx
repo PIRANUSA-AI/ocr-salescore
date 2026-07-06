@@ -4,7 +4,6 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -18,11 +17,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, UploadCloud, Camera, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getUploadUrl } from "@/app/actions/storage";
 import { extractCustomerFromForm } from "@/ai/flows/extract-customer-from-form";
 import { createManualCustomer } from "@/app/actions/leader";
 import { getAssignableUsers } from "@/app/actions/user";
-import { compressImageToDataUri, dataUriToBlob } from "@/lib/image-compress";
+import { compressImageToDataUri } from "@/lib/image-compress";
 import type { UserProfile } from "@/types";
 import {
   Select,
@@ -67,7 +65,6 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
   >("idle");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [ocrImageUrl, setOcrImageUrl] = useState<string>("");
-  const [ocrImageKey, setOcrImageKey] = useState<string>("");
   const [assignableUsers, setAssignableUsers] = useState<UserProfile[]>([]);
   const [hasCameraPermission, setHasCameraPermission] = useState<
     boolean | null
@@ -104,7 +101,6 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     setStatus("idle");
     setImagePreview(null);
     setOcrImageUrl("");
-    setOcrImageKey("");
     stopCamera();
     form.reset();
     if (fileInputRef.current) {
@@ -131,13 +127,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     async (imageDataUri: string) => {
       try {
         const compressed = await compressImageToDataUri(imageDataUri);
-        const contentType = "image/jpeg";
-        const { uploadUrl, key } = await getUploadUrl(contentType);
-        const blob = dataUriToBlob(compressed);
-        const uploadRes = await fetch(uploadUrl, { method: "PUT", body: blob });
-        if (!uploadRes.ok) throw new Error("Gagal upload gambar ke Cloudflare R2.");
-        setOcrImageKey(key);
-        const result = await extractCustomerFromForm({ imageKey: key });
+        const result = await extractCustomerFromForm({ imageDataUri: compressed });
         setImagePreview(result._fullResult?.imageUrl || "");
         setOcrImageUrl(result._fullResult?.imageUrl || "");
 
@@ -236,7 +226,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
         jobTitle: data.jobTitle,
         creatorTeam: data.creatorTeam,
         imageUrl: ocrImageUrl,
-        imageKey: ocrImageKey,
+        imageKey: "",
         assignedSalesId: isLeaderAssigningToSelf ? null : selectedUser.uid,
         assignedSalesName: isLeaderAssigningToSelf ? null : selectedUser.name,
 

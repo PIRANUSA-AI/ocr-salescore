@@ -1,26 +1,23 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Camera, Upload, Check, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getUploadUrl } from '@/app/actions/storage';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
 import { createManualCustomer } from '@/app/actions/leader';
-import { compressImageToDataUri, dataUriToBlob } from '@/lib/image-compress';
+import { compressImageToDataUri } from '@/lib/image-compress';
 import { useDashboard } from '../context/dashboard-context';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
-// Progressive steps shown while the AI reads the document
 const READING_STEPS = [
     'Memproses & mengompres gambar',
     'Menganalisis struktur dokumen',
@@ -42,9 +39,7 @@ interface OcrImportDialogProps {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     onCustomerAdded: () => void;
-    /** Image (data URI) captured externally — when provided, skips idle and processes immediately. */
     capturedImage?: string | null;
-    /** On open, jump straight into the in-page camera (used on desktop where native capture is unavailable). */
     startInCameraMode?: boolean;
 }
 
@@ -54,7 +49,6 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
     const [status, setStatus] = useState<Status>('idle');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [ocrImageKey, setOcrImageKey] = useState<string>('');
     const [result, setResult] = useState<ExtractResult | null>(null);
     const [fields, setFields] = useState<Record<string, string>>({});
     const [salesCode, setSalesCode] = useState<string>('');
@@ -77,7 +71,6 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
     const resetState = useCallback(() => {
         setStatus('idle');
         setImagePreview(null);
-        setOcrImageKey('');
         setResult(null);
         setFields({});
         setSalesCode('');
@@ -88,7 +81,6 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         if (fileInputRef.current) fileInputRef.current.value = '';
     }, [stopCamera]);
 
-    // Reset state when card closes
     useEffect(() => {
         if (!isOpen) {
             const timer = setTimeout(() => { resetState(); }, 300);
@@ -96,12 +88,8 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         }
     }, [isOpen, resetState]);
 
-    // Cycle through progressive steps while the AI is reading the document
     useEffect(() => {
-        if (status !== 'reading') {
-            setReadingStep(0);
-            return;
-        }
+        if (status !== 'reading') { setReadingStep(0); return; }
         const interval = setInterval(() => {
             setReadingStep(prev => (prev < READING_STEPS.length - 1 ? prev + 1 : prev));
         }, 1500);
@@ -115,16 +103,11 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
     const processImage = useCallback(async (dataUri: string) => {
         setStatus('reading');
+        setImagePreview(dataUri);
         try {
             const compressed = await compressImageToDataUri(dataUri);
-            const contentType = 'image/jpeg';
-            const { uploadUrl, key } = await getUploadUrl(contentType);
-            const blob = dataUriToBlob(compressed);
-            const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: blob });
-            if (!uploadRes.ok) throw new Error('Gagal upload gambar ke Cloudflare R2.');
-            setOcrImageKey(key);
-            const res = await extractCustomerVision({ imageKey: key });
-            setImagePreview(res.imageUrl || '');
+            const res = await extractCustomerVision({ imageDataUri: compressed });
+            setImagePreview(res.imageUrl || compressed);
             setResult(res);
             setFields({
                 name: res.name.value,
@@ -146,21 +129,18 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         }
     }, [toast, resetState]);
 
-    // When opened with an externally captured image, process it immediately
     useEffect(() => {
         if (isOpen && capturedImage && status === 'idle') {
             processImage(capturedImage);
         }
     }, [isOpen, capturedImage, status, processImage]);
 
-    // Desktop: jump straight into in-page camera when opened in camera mode
     useEffect(() => {
         if (isOpen && startInCameraMode && !capturedImage && status === 'idle') {
             setStatus('camera');
         }
     }, [isOpen, startInCameraMode, capturedImage, status]);
 
-    // getUserMedia camera stream for desktop camera mode
     useEffect(() => {
         if (isOpen && status === 'camera') {
             const enableCamera = async () => {
@@ -251,7 +231,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                 assignedSalesName: null,
                 notes: `Kode sales: ${salesCode}`,
                 imageUrl: result?.imageUrl || '',
-                imageKey: ocrImageKey,
+                imageKey: '',
                 acquisitionContext: {
                     source: 'OCR',
                     eventName: eventName.trim(),
@@ -354,7 +334,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                 return (
                     <div className="flex flex-col gap-4">
                         {imagePreview && (
-                            <div className="relative w-full h-44 sm:h-52 rounded-md overflow-hidden border bg-muted">
+                            <div className="w-full h-44 sm:h-52 rounded-md overflow-hidden border bg-muted">
                                 <img src={imagePreview} alt="Pratinjau" className="w-full h-full object-contain" />
                             </div>
                         )}
@@ -394,13 +374,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                                                 </span>
                                             )}
                                         </div>
-                                        <Input
-                                            id={key}
-                                            value={fields[key] || ''}
-                                            onChange={(e) => setFields((p) => ({ ...p, [key]: e.target.value }))}
-                                            disabled={status === 'saving'}
-                                            className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0"
-                                        />
+                                        <Input id={key} value={fields[key] || ''} onChange={(e) => setFields((p) => ({ ...p, [key]: e.target.value }))} disabled={status === 'saving'} className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0" />
                                         {hasAlt && (
                                             <div className="flex flex-wrap gap-1 mt-1">
                                                 {alternatives.map((alt, i) => (

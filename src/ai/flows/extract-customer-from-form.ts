@@ -1,7 +1,7 @@
 'use server';
 
 import { extractCustomer } from '@/lib/ocr/extract';
-import { getObjectAsDataUri, getPresignedUrl } from '@/lib/r2';
+import { uploadOcrImage, getPresignedUrl } from '@/lib/r2';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { FormAnswer } from '@/lib/ocr/types';
 
@@ -12,36 +12,28 @@ export interface OcrFormResult {
   phone?: string;
   email?: string;
   formAnswers?: FormAnswer[];
-  /** Full structured result from ARIES pipeline */
   _fullResult?: ExtractResult;
 }
 
-/**
- * Analyze a form image that has already been uploaded to R2.
- *
- * Flow:
- * 1. Client uploads directly to R2 via presigned PUT → gets `imageKey`
- * 2. Client calls this with the key
- * 3. Server fetches the image from R2, converts to base64,
- *    and passes it to the AI pipeline.
- */
 export async function extractCustomerFromForm(input: {
-  imageKey: string;
+  imageDataUri: string;
 }): Promise<OcrFormResult> {
-  if (!input?.imageKey) {
-    throw new Error('Key gambar tidak boleh kosong. Upload gambar ke R2 terlebih dahulu.');
+  if (!input?.imageDataUri) {
+    throw new Error('Gambar tidak boleh kosong.');
   }
 
-  console.log('[Flow: extractCustomerFromForm] ARIES pipeline from key:', input.imageKey);
+  // Step 1: Upload to R2
+  const key = await uploadOcrImage(input.imageDataUri);
+  console.log('[OCR] R2 upload OK → key:', key);
+
+  // Step 2: Presigned URL for AI + display
+  const imageUrl = await getPresignedUrl(key, 1800);
 
   try {
-    const dataUri = await getObjectAsDataUri(input.imageKey);
-    const result = await extractCustomer(dataUri, {
+    const result = await extractCustomer(imageUrl, {
       alwaysSecondOpinion: true,
     });
-
-    const viewUrl = await getPresignedUrl(input.imageKey);
-    result.imageUrl = viewUrl;
+    result.imageUrl = imageUrl;
 
     return {
       name: result.name.value || undefined,
