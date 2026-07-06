@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommandInput } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
@@ -47,14 +47,33 @@ export async function uploadToR2(
 
 /**
  * Generate a presigned URL for viewing/downloading an R2 object.
- * Expires in 1 hour by default — allows the frontend to view the image
- * without making the bucket public.
+ * Expires in 1 hour by default.
  */
 export async function getPresignedUrl(
   key: string,
   expiresInSeconds = 3600,
 ): Promise<string> {
   const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
+}
+
+/**
+ * Generate a presigned PUT URL so the client can upload directly to R2
+ * without sending file data through Vercel serverless functions.
+ * The client does a PUT request with the image binary to this URL.
+ * Expires in 15 minutes (enough for large uploads).
+ */
+export async function getPresignedUploadUrl(
+  key: string,
+  contentType: string,
+  expiresInSeconds = 900,
+): Promise<string> {
+  const params: PutObjectCommandInput = {
+    Bucket: bucket,
+    Key: key,
+    ContentType: contentType,
+  };
+  const command = new PutObjectCommand(params);
   return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
 }
 

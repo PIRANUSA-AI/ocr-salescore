@@ -66,3 +66,15 @@ export async function compressImageToDataUri(
   }
   return out;
 }
+
+/** Convert a data URI string to a Blob (client-side). */
+export function dataUriToBlob(dataUri: string): Blob {
+  const [header, base64] = dataUri.split(',');
+  const mime = header.split(':')[1]?.split(';')[0] || 'image/jpeg';
+  const binary = atob(base64);
+  const array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    array[i] = binary.charCodeAt(i);
+  }
+  return new Blob([array], { type: mime });
+}

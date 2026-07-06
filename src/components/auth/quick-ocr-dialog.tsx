@@ -18,11 +18,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, UploadCloud, Camera, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { uploadOcrImageAction } from "@/app/actions/storage";
+import { getUploadUrl, getR2PresignedUrl } from "@/app/actions/storage";
 import { extractCustomerFromForm } from "@/ai/flows/extract-customer-from-form";
 import { createManualCustomer } from "@/app/actions/leader";
 import { getAssignableUsers } from "@/app/actions/user";
-import { compressImageToDataUri } from "@/lib/image-compress";
+import { compressImageToDataUri, dataUriToBlob } from "@/lib/image-compress";
 import type { UserProfile } from "@/types";
 import {
   Select,
@@ -131,7 +131,12 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     async (imageDataUri: string) => {
       try {
         const compressed = await compressImageToDataUri(imageDataUri);
-        const { url, key } = await uploadOcrImageAction(compressed);
+        const contentType = "image/jpeg";
+        const { uploadUrl, key } = await getUploadUrl(contentType);
+        const blob = dataUriToBlob(compressed);
+        const uploadRes = await fetch(uploadUrl, { method: "PUT", body: blob });
+        if (!uploadRes.ok) throw new Error("Gagal upload gambar ke Cloudflare R2.");
+        const { url } = await getR2PresignedUrl(key);
         setImagePreview(url);
         setOcrImageUrl(url);
         setOcrImageKey(key);
