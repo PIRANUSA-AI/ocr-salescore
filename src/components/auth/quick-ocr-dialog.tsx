@@ -1,605 +1,435 @@
-"use client";
+'use client';
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, UploadCloud, Camera, ArrowLeft } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { extractCustomerFromForm } from "@/ai/flows/extract-customer-from-form";
-import { createManualCustomer } from "@/app/actions/leader";
-import { getAssignableUsers } from "@/app/actions/user";
-import { compressImageToDataUri } from "@/lib/image-compress";
-import type { UserProfile } from "@/types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2, Camera, Upload, Check, RotateCcw, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
+import type { ExtractResult } from '@/lib/ocr/extract';
+import type { Confidence } from '@/lib/ocr/types';
+import { createManualCustomer } from '@/app/actions/leader';
+import { compressImageToDataUri } from '@/lib/image-compress';
+import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const FormAnswerSchema = z.object({
-  question: z.string(),
-  answer: z.string(),
-});
+const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
-const QuickOcrSchema = z.object({
-  name: z.string().optional(),
-  email: z.string().email("Email tidak valid.").optional().or(z.literal("")),
-  phone: z.string().optional(),
-  company: z.string().optional(),
-  jobTitle: z.string().optional(),
-  assignedSalesId: z.string({
-    required_error: "Anda harus memilih nama Anda.",
-  }),
-  salesNoteName: z.string().optional(),
-  creatorTeam: z.enum(["AEC", "MFG"], {
-    required_error: "Tim pengguna harus ditentukan.",
-  }),
-  formAnswers: z.array(FormAnswerSchema).optional(),
-});
+const READING_STEPS = [
+    'Memproses & mengompres gambar',
+    'Menganalisis struktur dokumen',
+    'Mengenali teks (OCR)',
+    'Mengekstrak nama & kontak',
+    'Menyusun data pelanggan',
+];
 
-type FormData = z.infer<typeof QuickOcrSchema>;
+const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: string }> = {
+    high: { ring: 'border-green-500/40 bg-green-500/5', label: 'Yakin', text: 'text-green-600' },
+    medium: { ring: 'border-yellow-500/40 bg-yellow-500/5', label: 'Kurang yakin, cek lagi', text: 'text-yellow-600' },
+    low: { ring: 'border-red-500/40 bg-red-500/5', label: 'Ragu, wajib dicek', text: 'text-red-600' },
+    empty: { ring: 'border-muted', label: 'Kosong', text: 'text-muted-foreground' },
+};
+
+type Status = 'idle' | 'camera' | 'reading' | 'result' | 'saving';
 
 interface QuickOcrDialogProps {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
+    isOpen: boolean;
+    onOpenChange: (isOpen: boolean) => void;
 }
 
 export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
-  const [status, setStatus] = useState<
-    "idle" | "reading" | "mapping" | "saving" | "camera"
-  >("idle");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [ocrImageUrl, setOcrImageUrl] = useState<string>("");
-  const [assignableUsers, setAssignableUsers] = useState<UserProfile[]>([]);
-  const [hasCameraPermission, setHasCameraPermission] = useState<
-    boolean | null
-  >(null);
+    const { toast } = useToast();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { toast } = useToast();
+    const [status, setStatus] = useState<Status>('idle');
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [result, setResult] = useState<ExtractResult | null>(null);
+    const [fields, setFields] = useState<Record<string, string>>({});
+    const [salesCode, setSalesCode] = useState<string>('');
+    const [eventName, setEventName] = useState('IBT 2026');
+    const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
+    const [readingStep, setReadingStep] = useState(0);
+    const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(QuickOcrSchema),
-    defaultValues: {
-      formAnswers: [],
-    },
-  });
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { fields: formAnswerFields, replace: replaceFormAnswers } =
-    useFieldArray({
-      control: form.control,
-      name: "formAnswers",
-    });
-
-  const stopCamera = useCallback(() => {
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream)
-        .getTracks()
-        .forEach((track) => track.stop());
-      videoRef.current.srcObject = null;
-    }
-  }, []);
-
-  const resetState = useCallback(() => {
-    setStatus("idle");
-    setImagePreview(null);
-    setOcrImageUrl("");
-    stopCamera();
-    form.reset();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }, [form, stopCamera]);
-
-  const handleClose = () => {
-    if (status === "saving") return;
-    onOpenChange(false);
-  };
-
-  // Effect to reset state when dialog closes
-  useEffect(() => {
-    if (!isOpen) {
-      const timer = setTimeout(() => {
-        resetState();
-      }, 300); // Delay reset to allow for closing animation
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, resetState]);
-
-  const processImage = useCallback(
-    async (imageDataUri: string) => {
-      try {
-        const compressed = await compressImageToDataUri(imageDataUri);
-        const result = await extractCustomerFromForm({ imageDataUri: compressed });
-        setImagePreview(result._fullResult?.imageUrl || "");
-        setOcrImageUrl(result._fullResult?.imageUrl || "");
-
-        form.reset({
-          ...form.getValues(),
-          name: result.name || "",
-          company: result.company || "",
-          jobTitle: result.jobTitle || "",
-          email: result.email || "",
-          phone: result.phone || "",
-          formAnswers: result.formAnswers || [],
-        });
-        replaceFormAnswers(result.formAnswers || []);
-        setStatus("mapping");
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Gagal Ekstraksi OCR",
-          description:
-            error instanceof Error
-              ? error.message
-              : "Terjadi kesalahan tidak diketahui.",
-        });
-        resetState();
-      }
-    },
-    [form, resetState, toast, replaceFormAnswers],
-  );
-
-  const handleFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setStatus("reading");
-    setImagePreview(URL.createObjectURL(file));
-
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onloadend = async () => {
-      const imageDataUri = reader.result as string;
-      await processImage(imageDataUri);
-    };
-  };
-
-  const handleCaptureImage = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const videoEl = videoRef.current;
-    if (!videoEl.videoWidth) {
-      toast({
-        variant: "destructive",
-        title: "Kamera Belum Siap",
-        description: "Tunggu hingga tampilan kamera muncul, lalu coba lagi.",
-      });
-      return;
-    }
-    setStatus("reading");
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const context = canvas.getContext("2d");
-    if (context) {
-      context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-      const imageDataUri = canvas.toDataURL("image/jpeg");
-      setImagePreview(imageDataUri);
-      stopCamera(); // Stop camera after capture
-      processImage(imageDataUri);
-    }
-  };
-
-  const onSubmit = async (data: FormData) => {
-    const selectedUser = assignableUsers.find(
-      (s) => s.uid === data.assignedSalesId,
-    );
-    if (!selectedUser) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Pengguna yang dipilih tidak valid.",
-      });
-      return;
-    }
-
-    setStatus("saving");
-
-    const isLeaderAssigningToSelf = selectedUser.role === "Leader";
-
-    try {
-      await createManualCustomer({
-        name: data.name || "",
-        email: data.email,
-        phone: data.phone,
-        company: data.company,
-        jobTitle: data.jobTitle,
-        creatorTeam: data.creatorTeam,
-        imageUrl: ocrImageUrl,
-        imageKey: "",
-        assignedSalesId: isLeaderAssigningToSelf ? null : selectedUser.uid,
-        assignedSalesName: isLeaderAssigningToSelf ? null : selectedUser.name,
-
-        acquisitionContext: {
-          source: "OCR",
-          eventName: "Quick OCR Scan",
-          eventDate: new Date(),
-        },
-        products: [],
-        notes: data.salesNoteName
-          ? `Kontak dari: ${data.salesNoteName}`
-          : undefined,
-        formAnswers: data.formAnswers,
-      });
-
-      toast({
-        title: "Sukses!",
-        description: `Pelanggan "${data.name}" berhasil dibuat.`,
-      });
-      handleClose();
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Gagal Menyimpan Pelanggan",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Terjadi kesalahan tidak diketahui.",
-      });
-      setStatus("mapping");
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      getAssignableUsers()
-        .then(setAssignableUsers)
-        .catch(() => {
-          toast({
-            variant: "destructive",
-            title: "Gagal Memuat Pengguna",
-            description: "Tidak dapat memuat daftar sales dan leader.",
-          });
-        });
-    }
-
-    if (isOpen && status === "camera") {
-      const getCameraPermission = async () => {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: "environment",
-            },
-          });
-          setHasCameraPermission(true);
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(() => {});
-          }
-        } catch (error) {
-          console.error("Error accessing camera:", error);
-          setHasCameraPermission(false);
+    const stopCamera = useCallback(() => {
+        if (videoRef.current?.srcObject) {
+            (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
         }
-      };
-      getCameraPermission();
-    } else {
-      stopCamera();
-    }
+    }, []);
 
-    return () => {
-      stopCamera();
+    const resetState = useCallback(() => {
+        setStatus('idle');
+        setImagePreview(null);
+        setResult(null);
+        setFields({});
+        setSalesCode('');
+        setEventName('IBT 2026');
+        setCreatorTeam('AEC');
+        setReadingStep(0);
+        setHasCameraPermission(null);
+        stopCamera();
+    }, [stopCamera]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            const timer = setTimeout(() => { resetState(); }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen, resetState]);
+
+    useEffect(() => {
+        if (status !== 'reading') { setReadingStep(0); return; }
+        const interval = setInterval(() => {
+            setReadingStep(prev => (prev < READING_STEPS.length - 1 ? prev + 1 : prev));
+        }, 1500);
+        return () => clearInterval(interval);
+    }, [status]);
+
+    const handleClose = () => {
+        if (status === 'saving') return;
+        onOpenChange(false);
     };
-  }, [isOpen, status, stopCamera, toast]);
 
-  const handleUserChange = (userId: string) => {
-    const selectedUser = assignableUsers.find((u) => u.uid === userId);
-    if (selectedUser) {
-      form.setValue("assignedSalesId", userId);
-      form.setValue("creatorTeam", selectedUser.team);
-    }
-  };
+    const processImage = useCallback(async (dataUri: string) => {
+        setStatus('reading');
+        setImagePreview(dataUri);
+        try {
+            const compressed = await compressImageToDataUri(dataUri);
+            const res = await extractCustomerVision({ imageDataUri: compressed });
+            setImagePreview(res.imageUrl || compressed);
+            setResult(res);
+            setFields({
+                name: res.name.value,
+                company: res.company.value,
+                jobTitle: res.jobTitle.value,
+                division: res.division.value,
+                phone: res.phone.value,
+                email: res.email.value,
+                softwareNeeds: res.softwareNeeds.value,
+            });
+            setStatus('result');
+        } catch (err) {
+            toast({
+                variant: 'destructive',
+                title: 'Gagal Ekstraksi OCR',
+                description: err instanceof Error ? err.message : 'Terjadi kesalahan.',
+            });
+            resetState();
+        }
+    }, [toast, resetState]);
 
-  const renderContent = () => {
-    switch (status) {
-      case "camera":
-        return (
-          <div className="flex flex-col items-center justify-center space-y-4 min-h-[400px]">
-            {hasCameraPermission === false ? (
-              <Alert variant="destructive">
-                <AlertTitle>Akses Kamera Ditolak</AlertTitle>
-                <AlertDescription>
-                  Izinkan akses kamera di pengaturan browser Anda untuk
-                  menggunakan fitur ini.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <>
-                <div className="w-full max-w-[280px] aspect-[9/16] bg-black rounded-lg overflow-hidden relative">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    muted
-                    playsInline
-                  />
-                  <div className="absolute inset-0 border-4 md:border-[1rem] border-black/30 rounded-lg box-border"></div>
-                </div>
-                <Button onClick={handleCaptureImage}>Ambil Gambar</Button>
-              </>
-            )}
-            <Button variant="outline" onClick={() => setStatus("idle")}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
-            </Button>
-          </div>
-        );
-      case "idle":
-        return (
-          <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/30 rounded-lg p-12 space-y-4 min-h-[400px]">
-            <p className="text-muted-foreground text-center">
-              Unggah foto kartu nama atau formulir, atau gunakan kamera untuk
-              memindai.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <UploadCloud className="mr-2 h-4 w-4" /> Pilih Gambar
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setStatus("camera")}
-              >
-                <Camera className="mr-2 h-4 w-4" /> Gunakan Kamera
-              </Button>
-            </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/png, image/jpeg, image/webp"
-              className="hidden"
-            />
-          </div>
-        );
-      case "reading":
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[400px]">
-            <Loader2 className="w-12 h-12 animate-spin text-primary" />
-            <p className="mt-4 text-muted-foreground">
-              AI sedang memindai dokumen...
-            </p>
-          </div>
-        );
-      case "mapping":
-      case "saving":
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            <div className="space-y-4">
-              <div className="relative w-full aspect-[9/16] rounded-md overflow-hidden border bg-muted">
-                {imagePreview && (
-                  <img
-                    src={imagePreview}
-                    alt="Preview Dokumen"
-                    className="w-full h-full object-contain"
-                  />
-                )}
-              </div>
-            </div>
+    useEffect(() => {
+        if (isOpen && status === 'camera') {
+            const enableCamera = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    setHasCameraPermission(true);
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        videoRef.current.play().catch(() => {});
+                    }
+                } catch (err) {
+                    console.error('Camera error:', err);
+                    setHasCameraPermission(false);
+                }
+            };
+            enableCamera();
+        }
+        return () => { stopCamera(); };
+    }, [isOpen, status, stopCamera]);
 
-            <form
-              id="quick-ocr-form"
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-3 overflow-y-auto max-h-[60vh] pr-2"
-            >
-              <p className="text-sm text-muted-foreground col-span-full">
-                Verifikasi hasil pindaian AI dan pilih nama Anda sebagai pemilik
-                kontak ini.
-              </p>
-              <div>
-                <Label htmlFor="assignedSalesId">
-                  Nama Anda (Pemilik Kontak)
-                </Label>
-                <Select
-                  onValueChange={handleUserChange}
-                  defaultValue={form.getValues("assignedSalesId")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih nama Anda..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {assignableUsers.map((s) => (
-                      <SelectItem key={s.uid} value={s.uid}>
-                        {s.name} ({s.role})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.assignedSalesId && (
-                  <p className="text-xs text-destructive mt-1">
-                    {form.formState.errors.assignedSalesId.message}
-                  </p>
-                )}
-                {form.formState.errors.creatorTeam && (
-                  <p className="text-xs text-destructive mt-1">
-                    {form.formState.errors.creatorTeam.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="salesNoteName">Catatan (Optional)</Label>
-                <Input
-                  id="salesNoteName"
-                  {...form.register("salesNoteName")}
-                  placeholder="Catatan (Optional)"
-                  disabled={status === "saving"}
-                />
-              </div>
-              <div>
-                <Label htmlFor="name">Nama Kontak</Label>
-                <Input
-                  id="name"
-                  {...form.register("name")}
-                  disabled={status === "saving"}
-                />
-              </div>
-              <div>
-                <Label htmlFor="company">Perusahaan</Label>
-                <Input
-                  id="company"
-                  {...form.register("company")}
-                  disabled={status === "saving"}
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="jobTitle">Jabatan</Label>
-                  <Input
-                    id="jobTitle"
-                    {...form.register("jobTitle")}
-                    disabled={status === "saving"}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone">No. Telepon</Label>
-                  <Input
-                    id="phone"
-                    {...form.register("phone")}
-                    disabled={status === "saving"}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...form.register("email")}
-                  disabled={status === "saving"}
-                />
-              </div>
-              <div className="col-span-2 space-y-3 pt-2">
-                <Label className="font-medium">Jawaban Form</Label>
-                {formAnswerFields.map((field, index) => {
-                  const isPriorityField = field.question
-                    .toLowerCase()
-                    .includes("prioritas");
-                  return (
-                    <div key={field.id} className="space-y-1">
-                      <Label
-                        htmlFor={`form-q-${index}`}
-                        className="text-xs text-muted-foreground"
-                      >
-                        {field.question}
-                      </Label>
-                      {isPriorityField ? (
-                        <Controller
-                          control={form.control}
-                          name={`formAnswers.${index}.answer`}
-                          render={({ field: controllerField }) => (
-                            <Select
-                              onValueChange={controllerField.onChange}
-                              value={controllerField.value}
-                              disabled={status === "saving"}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih prioritas..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">(Kosong)</SelectItem>
-                                <SelectItem value="Low">Low</SelectItem>
-                                <SelectItem value="Medium">Medium</SelectItem>
-                                <SelectItem value="High">High</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                      ) : (
-                        <Input
-                          id={`form-q-${index}`}
-                          {...form.register(`formAnswers.${index}.answer`)}
-                          disabled={status === "saving"}
-                        />
-                      )}
+    const handleCaptureImage = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video.videoWidth) {
+            toast({ variant: 'destructive', title: 'Kamera Belum Siap', description: 'Tunggu hingga tampilan kamera muncul.' });
+            return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        const dataUri = canvas.toDataURL('image/jpeg');
+        stopCamera();
+        processImage(dataUri);
+    };
+
+    const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUri = reader.result as string;
+            setImagePreview(dataUri);
+            processImage(dataUri);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const onSave = async () => {
+        if (!fields.name?.trim()) {
+            toast({ variant: 'destructive', title: 'Nama wajib diisi.' });
+            return;
+        }
+        if (!salesCode) {
+            toast({ variant: 'destructive', title: 'Pilih kode tim sales.' });
+            return;
+        }
+        if (!eventName.trim()) {
+            toast({ variant: 'destructive', title: 'Nama event wajib diisi.' });
+            return;
+        }
+        const emailValue = fields.email?.trim();
+        if (emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+            toast({ variant: 'destructive', title: 'Email tidak valid.', description: 'Perbaiki atau kosongkan field email sebelum menyimpan.' });
+            return;
+        }
+
+        setStatus('saving');
+        try {
+            const formAnswers = [
+                { question: 'Divisi', answer: fields.division || '' },
+                { question: 'Kebutuhan Software', answer: fields.softwareNeeds || '' },
+                { question: 'Kode Tim Sales', answer: salesCode },
+            ].filter((qa) => qa.answer);
+
+            await createManualCustomer({
+                name: fields.name.trim(),
+                company: fields.company?.trim() || '',
+                jobTitle: fields.jobTitle?.trim() || '',
+                phone: fields.phone?.trim() || '',
+                email: fields.email?.trim() || '',
+                creatorTeam,
+                products: [],
+                assignedSalesId: null,
+                assignedSalesName: null,
+                notes: `Kode sales: ${salesCode}`,
+                imageUrl: result?.imageUrl || '',
+                imageKey: '',
+                acquisitionContext: {
+                    source: 'OCR',
+                    eventName: eventName.trim(),
+                    eventDate: new Date(),
+                },
+                formAnswers,
+            } as any);
+
+            toast({ title: 'Tersimpan', description: `Kontak ${fields.name} berhasil ditambahkan.` });
+            handleClose();
+        } catch (err) {
+            toast({
+                variant: 'destructive',
+                title: 'Gagal Menyimpan',
+                description: err instanceof Error ? err.message : 'Terjadi kesalahan.',
+            });
+            setStatus('result');
+        }
+    };
+
+    const fieldConfig: { key: string; label: string; conf: Confidence; alternatives: string[] }[] = [
+        { key: 'name', label: 'Nama', conf: result?.name.confidence ?? 'high', alternatives: result?.name.alternatives ?? [] },
+        { key: 'company', label: 'Perusahaan', conf: result?.company.confidence ?? 'high', alternatives: result?.company.alternatives ?? [] },
+        { key: 'jobTitle', label: 'Jabatan', conf: result?.jobTitle.confidence ?? 'high', alternatives: result?.jobTitle.alternatives ?? [] },
+        { key: 'division', label: 'Divisi', conf: result?.division.confidence ?? 'empty', alternatives: result?.division.alternatives ?? [] },
+        { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high', alternatives: result?.phone.alternatives ?? [] },
+        { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high', alternatives: result?.email.alternatives ?? [] },
+        { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high', alternatives: result?.softwareNeeds.alternatives ?? [] },
+    ];
+
+    const renderContent = () => {
+        switch (status) {
+            case 'idle':
+                return (
+                    <div className="flex flex-col gap-3 py-4">
+                        <Button size="lg" className="h-20 text-base active:translate-y-px" onClick={() => cameraInputRef.current?.click()}>
+                            <Camera className="h-6 w-6 mr-3" /> Foto Langsung
+                        </Button>
+                        <Button size="lg" variant="outline" className="h-14 active:translate-y-px" onClick={() => fileInputRef.current?.click()}>
+                            <Upload className="h-5 w-5 mr-2" /> Unggah Gambar
+                        </Button>
+                        <p className="text-xs text-muted-foreground text-center pt-1">
+                            Foto kartu nama atau form customer. AI akan mengekstrak datanya.
+                        </p>
                     </div>
-                  );
-                })}
-                {formAnswerFields.length === 0 && (
-                  <p className="text-xs text-center text-muted-foreground py-2 border rounded-md">
-                    Tidak ada jawaban form yang terdeteksi.
-                  </p>
-                )}
-              </div>
-            </form>
-          </div>
-        );
-    }
-  };
+                );
+            case 'camera':
+                return (
+                    <div className="flex flex-col items-center justify-center gap-4 min-h-[300px] md:min-h-[400px]">
+                        <canvas ref={canvasRef} className="hidden" />
+                        {hasCameraPermission === false ? (
+                            <Alert variant="destructive">
+                                <AlertTitle>Akses Kamera Ditolak</AlertTitle>
+                                <AlertDescription>Izinkan akses kamera di pengaturan browser Anda.</AlertDescription>
+                            </Alert>
+                        ) : (
+                            <>
+                                <div className="w-full max-w-xs aspect-[4/3] bg-black rounded-lg overflow-hidden relative">
+                                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                                </div>
+                                <Button onClick={handleCaptureImage} size="lg"><Camera className="mr-2 h-5 w-5" /> Ambil Gambar</Button>
+                            </>
+                        )}
+                        <Button variant="outline" onClick={() => setStatus('idle')}><ArrowLeft className="mr-2 h-4 w-4" /> Kembali</Button>
+                    </div>
+                );
+            case 'reading':
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-[300px] md:min-h-[400px] w-full max-w-md mx-auto py-4">
+                        <div className="w-full space-y-3">
+                            <p className="text-center text-sm font-medium text-muted-foreground mb-4">AI sedang membaca dokumen...</p>
+                            {READING_STEPS.map((label, i) => {
+                                const isDone = i < readingStep;
+                                const isActive = i === readingStep;
+                                return (
+                                    <div key={label} className={cn(
+                                        "flex items-center gap-3 rounded-md border p-3 transition-colors",
+                                        isActive ? "border-primary bg-primary/5" : isDone ? "border-transparent opacity-60" : "border-transparent opacity-40"
+                                    )}>
+                                        <span className="flex h-6 w-6 items-center justify-center flex-shrink-0">
+                                            {isDone ? (
+                                                <Check className="h-5 w-5 text-green-600" />
+                                            ) : isActive ? (
+                                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                            ) : (
+                                                <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                                            )}
+                                        </span>
+                                        <span className={cn("text-sm", isActive && "font-medium text-foreground")}>{label}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            case 'result':
+            case 'saving':
+                return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start py-2">
+                        {/* Kiri - Pratinjau Image */}
+                        <div className="space-y-4">
+                            {imagePreview && (
+                                <div className="relative w-full aspect-[4/3] rounded-md overflow-hidden border bg-muted">
+                                    <img src={imagePreview} alt="Pratinjau" className="w-full h-full object-contain" />
+                                </div>
+                            )}
+                            {result && result.overriddenFields.length > 0 && (
+                                <p className="text-xs text-muted-foreground">Beberapa field ditinjau ulang oleh AI pembanding.</p>
+                            )}
 
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-4xl grid-rows-[auto_1fr_auto]">
-        <DialogHeader>
-          <DialogTitle>Pindai Cepat</DialogTitle>
-          <DialogDescription>
-            Unggah gambar, pilih nama Anda, dan kontak akan langsung dibuat.
-            Jika Anda seorang Leader, kontak akan masuk ke daftar "Belum
-            Ditugaskan".
-          </DialogDescription>
-        </DialogHeader>
+                            {/* Pilih Tim yang sebelumnya hanya ada di dashboard userProfile */}
+                            <div className="flex flex-col gap-1.5 p-3 border rounded-md bg-muted/20">
+                                <Label htmlFor="creatorTeam">Tim Pengguna <span className="text-red-500">*</span></Label>
+                                <Select value={creatorTeam} onValueChange={(val: any) => setCreatorTeam(val)} disabled={status === 'saving'}>
+                                    <SelectTrigger id="creatorTeam">
+                                        <SelectValue placeholder="Pilih tim..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="AEC">AEC (Architecture)</SelectItem>
+                                        <SelectItem value="MFG">MFG (Manufacturing)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
 
-        <div
-          className="py-4 pr-3 overflow-y-auto"
-          style={{ maxHeight: "75vh" }}
-        >
-          <canvas ref={canvasRef} className="hidden" />
-          {renderContent()}
-        </div>
+                        {/* Kanan - Form Editor */}
+                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="eventName">Nama Event / Acara <span className="text-red-500">*</span></Label>
+                                <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Contoh: Pameran MFI 2026" disabled={status === 'saving'} />
+                            </div>
 
-        <DialogFooter>
-          {status !== "idle" && status !== "camera" && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={resetState}
-              disabled={status === "saving" || status === "reading"}
-            >
-              Pindai Lagi
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={status === "saving"}
-          >
-            Tutup
-          </Button>
-          {(status === "mapping" || status === "saving") && (
-            <Button
-              type="submit"
-              form="quick-ocr-form"
-              disabled={status === "saving"}
-            >
-              {status === "saving" && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Simpan Kontak
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="salesCode">Kode Tim Sales <span className="text-red-500">*</span></Label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {SALES_CODES.map((code) => (
+                                        <Button key={code} type="button" variant={salesCode === code ? 'default' : 'outline'} size="sm" className="active:translate-y-px" disabled={status === 'saving'} onClick={() => setSalesCode(code)}>
+                                            {code}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="border-t pt-3 flex flex-col gap-2.5">
+                                <p className="text-xs text-muted-foreground">Verifikasi hasil ekstraksi AI. Ketuk alternatif di bawah input jika ada.</p>
+                                {fieldConfig.map(({ key, label, conf, alternatives }) => {
+                                    const style = CONFIDENCE_STYLE[conf];
+                                    const needsCheck = conf === 'medium' || conf === 'low';
+                                    const hasAlt = alternatives.length > 0;
+                                    return (
+                                        <div key={key} className={cn("flex flex-col gap-1 rounded-md border p-2", style.ring)}>
+                                            <div className="flex items-center justify-between">
+                                                <Label htmlFor={key} className="text-xs font-semibold">{label}</Label>
+                                                {needsCheck && (
+                                                    <span className={cn("text-[10px] flex items-center gap-0.5 font-medium", style.text)}>
+                                                        <AlertTriangle className="h-3 w-3" /> {style.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <Input id={key} value={fields[key] || ''} onChange={(e) => setFields((p) => ({ ...p, [key]: e.target.value }))} disabled={status === 'saving'} className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0" />
+                                            {hasAlt && (
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {alternatives.map((alt, i) => (
+                                                        <button key={i} type="button" onClick={() => setFields((p) => ({ ...p, [key]: alt }))}
+                                                            className="text-[10px] px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
+                                                            {alt}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                );
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={handleClose}>
+            <DialogContent className={cn("sm:max-w-4xl grid-rows-[auto_1fr_auto]", status === 'idle' && 'sm:max-w-md')}>
+                <DialogHeader>
+                    <DialogTitle>Pindai Cepat</DialogTitle>
+                    <DialogDescription>
+                        Unggah gambar kartu nama atau form customer. AI akan mengekstrak datanya dan mendeteksi tingkat keyakinan (confidence).
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="py-2 pr-1">
+                    <canvas ref={canvasRef} className="hidden" />
+                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFileSelected} />
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileSelected} />
+                    {renderContent()}
+                </div>
+
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end border-t pt-3">
+                    {status !== 'idle' && (
+                        <Button type="button" variant="ghost" onClick={resetState} disabled={status === 'saving' || status === 'reading'} className="w-full sm:w-auto">
+                            <RotateCcw className="h-4 w-4 mr-1" /> Mulai Ulang
+                        </Button>
+                    )}
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <Button type="button" variant="outline" onClick={handleClose} disabled={status === 'saving'} className="flex-1 sm:flex-initial">Batal</Button>
+                        {(status === 'result' || status === 'saving') && (
+                            <Button type="button" onClick={onSave} disabled={status === 'saving'} className="flex-1 sm:flex-initial">
+                                {status === 'saving' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                                Simpan Pelanggan
+                            </Button>
+                        )}
+                    </div>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }

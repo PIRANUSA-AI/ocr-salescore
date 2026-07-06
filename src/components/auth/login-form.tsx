@@ -20,13 +20,13 @@ import { handleSignupAction } from '@/app/actions/auth';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Email tidak valid.' }),
-  password: z.string().min(6, { message: 'Minimal 6 karakter.' }),
+  password: z.string().min(1, { message: 'Minimal 1 karakter.' }),
 });
 
 const leaderSignupSchema = z.object({
   name: z.string().min(1, 'Nama wajib diisi.'),
   email: z.string().email('Email tidak valid.'),
-  password: z.string().min(6, 'Minimal 6 karakter.'),
+  password: z.string().min(1, 'Minimal 1 karakter.'),
   team: z.enum(['AEC', 'MFG'], { required_error: 'Tim harus dipilih.' }),
   specialKey: z.string().refine(val => val === "LeadPira", { message: "Kunci khusus tidak valid." }),
   role: z.literal('Leader'),
@@ -35,7 +35,7 @@ const leaderSignupSchema = z.object({
 const salesSignupSchema = z.object({
   name: z.string().min(1, 'Nama wajib diisi.'),
   email: z.string().email('Email tidak valid.'),
-  password: z.string().min(6, 'Minimal 6 karakter.'),
+  password: z.string().min(1, 'Minimal 1 karakter.'),
   team: z.enum(['AEC', 'MFG'], { required_error: 'Tim harus dipilih.' }),
   role: z.literal('Sales'),
 });
@@ -43,7 +43,7 @@ const salesSignupSchema = z.object({
 const superadminSignupSchema = z.object({
   name: z.string().min(1, 'Nama wajib diisi.'),
   email: z.string().email('Email tidak valid.'),
-  password: z.string().min(6, 'Minimal 6 karakter.'),
+  password: z.string().min(1, 'Minimal 1 karakter.'),
   team: z.enum(['AEC', 'MFG'], { required_error: 'Tim harus dipilih.' }),
   specialKey: z.string().refine(val => val === "SuperPira", { message: "Kunci khusus tidak valid." }),
   role: z.literal('Superadmin'),
@@ -97,9 +97,12 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
 
   const handleLogin = async (data: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
+    // Pad password shorter than 6 chars (e.g. "1" -> "111111")
+    const finalPassword = data.password.length < 6 ? data.password.repeat(6).slice(0, 6) : data.password;
+
     try {
       if (AUTH_MODE === 'local') {
-        const result = await loginLocal(data.email, data.password);
+        const result = await loginLocal(data.email, finalPassword);
         if (!result.success) {
           toast({ variant: 'destructive', title: 'Autentikasi Gagal', description: result.error });
           setIsLoading(false);
@@ -110,7 +113,7 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
         router.push('/dashboard');
         return;
       }
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      await signInWithEmailAndPassword(auth, data.email, finalPassword);
       toast({ title: "Login Berhasil", description: "Mengalihkan ke dasbor..." });
       router.push('/dashboard');
     } catch (error: any) {
@@ -121,13 +124,17 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
 
   const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
+    // Pad password shorter than 6 chars
+    const finalPassword = data.password.length < 6 ? data.password.repeat(6).slice(0, 6) : data.password;
+    const submissionData = { ...data, password: finalPassword };
+
     const result =
       AUTH_MODE === 'local'
         ? await signupLocal({
-            name: data.name, email: data.email, password: data.password,
-            role: data.role, team: data.team,
+            name: submissionData.name, email: submissionData.email, password: submissionData.password,
+            role: submissionData.role, team: submissionData.team,
           })
-        : await handleSignupAction(data);
+        : await handleSignupAction(submissionData);
     setIsLoading(false);
     if (result.success) {
       toast({ title: 'Pendaftaran Berhasil', description: 'Silakan masuk untuk melanjutkan.' });

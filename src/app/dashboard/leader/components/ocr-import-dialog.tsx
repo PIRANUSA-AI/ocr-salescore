@@ -52,7 +52,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
     const [result, setResult] = useState<ExtractResult | null>(null);
     const [fields, setFields] = useState<Record<string, string>>({});
     const [salesCode, setSalesCode] = useState<string>('');
-    const [eventName, setEventName] = useState('');
+    const [eventName, setEventName] = useState('IBT 2026');
     const [readingStep, setReadingStep] = useState(0);
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
@@ -74,6 +74,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         setResult(null);
         setFields({});
         setSalesCode('');
+        setEventName('IBT 2026');
         setReadingStep(0);
         setHasCameraPermission(null);
         stopCamera();
