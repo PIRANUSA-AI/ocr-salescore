@@ -114,6 +114,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 phone: res.phone.value,
                 email: res.email.value,
                 softwareNeeds: res.softwareNeeds.value,
+                address: res.address.value,
             });
             setStatus('result');
         } catch (err) {
@@ -209,6 +210,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 jobTitle: fields.jobTitle?.trim() || '',
                 phone: fields.phone?.trim() || '',
                 email: fields.email?.trim() || '',
+                address: fields.address?.trim() || '',
                 creatorTeam,
                 products: [],
                 assignedSalesId: null,
@@ -244,6 +246,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
         { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high', alternatives: result?.phone.alternatives ?? [] },
         { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high', alternatives: result?.email.alternatives ?? [] },
         { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high', alternatives: result?.softwareNeeds.alternatives ?? [] },
+        { key: 'address', label: 'Alamat', conf: result?.address.confidence ?? 'empty', alternatives: result?.address.alternatives ?? [] },
     ];
 
     const renderContent = () => {

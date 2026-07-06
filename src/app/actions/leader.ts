@@ -39,6 +39,7 @@ const ManualCustomerInputSchema = z.object({
     products: z.array(ProductSchema).optional(),
     imageUrl: z.string().optional(),
     imageKey: z.string().optional(),
+    address: z.string().optional(),
 
     acquisitionContext: z.object({
         source: z.enum(CUSTOMER_SOURCES).default('Lainnya'),
@@ -144,7 +145,7 @@ export async function createManualCustomer(input: z.infer<typeof ManualCustomerI
         throw new Error(firstError);
     }
 
-    const { name, email, phone, company, jobTitle, products, notes, assignedSalesId, assignedSalesName, creatorTeam, formAnswers, acquisitionContext, imageUrl, imageKey } = validation.data;
+    const { name, email, phone, company, jobTitle, products, notes, assignedSalesId, assignedSalesName, creatorTeam, formAnswers, acquisitionContext, imageUrl, imageKey, address } = validation.data;
     const now = Timestamp.now();
 
     const customerData: Partial<Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>> = {
@@ -158,6 +159,7 @@ export async function createManualCustomer(input: z.infer<typeof ManualCustomerI
         formAnswers: formAnswers || [],
         imageUrl: imageUrl || '',
         imageKey: imageKey || '',
+        address: address || '',
         acquisitionContext: {
             ...acquisitionContext,
             eventDate: acquisitionContext.eventDate.toISOString(),
@@ -484,7 +486,7 @@ export async function updateCustomer(input: z.infer<typeof UpdateCustomerInputSc
         throw new Error(firstError);
     }
 
-    const { customerId, name, email, phone, company, jobTitle, products, potentialRevenue, pipelineStatus, acquisitionContext, notes } = validation.data;
+    const { customerId, name, email, phone, company, jobTitle, products, potentialRevenue, pipelineStatus, acquisitionContext, notes, address } = validation.data;
     const now = Timestamp.now();
 
     const formattedProducts: Product[] = (products || []).map((p, i) => ({
@@ -503,6 +505,7 @@ export async function updateCustomer(input: z.infer<typeof UpdateCustomerInputSc
         company: company || '',
         jobTitle: jobTitle || '',
         products: formattedProducts,
+        address: address || '',
         updatedAt: now,
     };
 

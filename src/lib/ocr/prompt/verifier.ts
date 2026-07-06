@@ -33,6 +33,10 @@ LANGKAH 1 — REVIEW SETIAP FIELD:
 - DIVISION: Finance, IT, Marketing, HRD, Produksi, Engineering.
 - Jika tertukar, perbaiki posisinya.
 
+📍 ADDRESS:
+- Alamat kantor atau pribadi, biasanya mengandung kata: Jl., Jalan, Ruko, Gedung, Kav., Blok, Lantai, Lt., Jakarta, Bandung, Surabaya, dll.
+- JANGAN campur alamat ke dalam COMPANY atau NOTES jika bisa dipisahkan.
+
 💻 SOFTWARE NEEDS:
 - Nama software CAD/engineering: ZWCAD, AutoCAD, SketchUp, D5 Render, CATIA, SolidWorks, Archicad, Enscape, ZW3D, Revit.
 
@@ -97,6 +101,9 @@ CEK PHONE:
 CEK SOFTWARE NEEDS:
 - Nama software CAD/engineering: ZWCAD, AutoCAD, SketchUp, D5 Render, CATIA, SolidWorks, Archicad, Enscape, ZW3D, Revit.
 - Jika berisi nama perusahaan → mungkin COMPANY, bukan software.
+
+CEK ADDRESS:
+- Alamat fisik lengkap (Jl., Ruko, Gedung, Kota, dll.). Pastikan ejaan nama jalan dan kota di Indonesia ditulis dengan benar.
 
 ATURAN:
 - Jika kata tidak dikenal dalam Bahasa Indonesia → curigai sebagai OCR error.

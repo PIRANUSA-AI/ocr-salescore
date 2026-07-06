@@ -51,6 +51,7 @@ const updateCustomerDetailsSchema = z.object({
     notes: z.string().optional(), // For adding new notes
     products: z.array(ProductSchema).optional(),
     formAnswers: z.array(FormAnswerSchema).optional(), // Add formAnswers
+    address: z.string().optional(), // Add address
 });
 
 // This schema now accepts the full, rich history object

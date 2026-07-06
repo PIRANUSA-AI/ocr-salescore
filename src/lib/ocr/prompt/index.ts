@@ -45,6 +45,7 @@ export const OcrResultSchema = z.object({
   phone: OcrFieldSchema,
   email: OcrFieldSchema,
   softwareNeeds: OcrFieldSchema,
+  address: OcrFieldSchema,
   formAnswers: z.array(FormAnswerSchema).optional(),
 });
 

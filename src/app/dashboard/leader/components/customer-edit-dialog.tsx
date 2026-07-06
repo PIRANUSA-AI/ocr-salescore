@@ -44,6 +44,7 @@ const CustomerInputSchema = z.object({
   phone: z.string().optional(),
   company: z.string().optional(),
   jobTitle: z.string().optional(),
+  address: z.string().optional(),
   products: z.array(ProductSchema).optional(),
   potentialRevenue: z.coerce.number().optional(),
   pipelineStatus: z.enum(PIPELINE_STAGES).optional(),
@@ -83,6 +84,7 @@ export function CustomerEditDialog({ editDialogState, closeCustomerEditDialog, h
                     phone: customer.phone,
                     company: customer.company,
                     jobTitle: customer.jobTitle,
+                    address: customer.address || '',
                     products: customer.products.map(p => ({
                         ...p,
                         purchaseDate: new Date(p.purchaseDate),
@@ -104,6 +106,7 @@ export function CustomerEditDialog({ editDialogState, closeCustomerEditDialog, h
                     phone: '',
                     company: '',
                     jobTitle: '',
+                    address: '',
                     products: [],
                     potentialRevenue: 0,
                     pipelineStatus: 'Leads Generation 10%',
@@ -182,6 +185,10 @@ export function CustomerEditDialog({ editDialogState, closeCustomerEditDialog, h
                                 <div className="col-span-2">
                                     <Label htmlFor="jobTitle">Jabatan</Label>
                                     <Input id="jobTitle" {...form.register('jobTitle')} disabled={isLoading} />
+                                </div>
+                                <div className="col-span-2">
+                                    <Label htmlFor="address">Alamat</Label>
+                                    <Input id="address" {...form.register('address')} disabled={isLoading} />
                                 </div>
                                 <div>
                                     <Label htmlFor="potentialRevenue">Potensi Pendapatan (Rp)</Label>

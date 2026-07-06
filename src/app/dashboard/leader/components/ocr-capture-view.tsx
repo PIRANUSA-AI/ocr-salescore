@@ -75,6 +75,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         phone: res.phone.value,
         email: res.email.value,
         softwareNeeds: res.softwareNeeds.value,
+        address: res.address.value,
       });
       setStatus('result');
     } catch (err) {
@@ -137,6 +138,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         jobTitle: fields.jobTitle?.trim() || '',
         phone: fields.phone?.trim() || '',
         email: fields.email?.trim() || '',
+        address: fields.address?.trim() || '',
         creatorTeam: (userProfile.team === 'MFG' ? 'MFG' : 'AEC'),
         products: [],
         assignedSalesId: null,
@@ -232,6 +234,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high', alternatives: result?.phone.alternatives ?? [] },
     { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high', alternatives: result?.email.alternatives ?? [] },
     { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high', alternatives: result?.softwareNeeds.alternatives ?? [] },
+    { key: 'address', label: 'Alamat', conf: result?.address.confidence ?? 'empty', alternatives: result?.address.alternatives ?? [] },
   ];
 
   return (

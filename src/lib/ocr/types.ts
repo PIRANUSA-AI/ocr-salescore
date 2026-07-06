@@ -19,6 +19,7 @@ export interface OcrResult {
   phone: OcrField;
   email: OcrField;
   softwareNeeds: OcrField;
+  address: OcrField;
   formAnswers?: FormAnswer[];
 }
 
@@ -30,6 +31,7 @@ export const OCR_FIELDS: (keyof OcrResult)[] = [
   'phone',
   'email',
   'softwareNeeds',
+  'address',
 ];
 
 export const OCR_FIELD_LABELS: Record<string, string> = {
@@ -40,6 +42,7 @@ export const OCR_FIELD_LABELS: Record<string, string> = {
   phone: 'No. Telepon',
   email: 'Email',
   softwareNeeds: 'Kebutuhan Software',
+  address: 'Alamat',
 };
 
 export interface OcrProvider {

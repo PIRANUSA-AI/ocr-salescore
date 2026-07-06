@@ -80,6 +80,7 @@ const CustomerFormSchema = z.object({
     email: z.string().email('Email tidak valid.').optional().or(z.literal('')),
     phone: z.string().optional(),
     potentialRevenue: z.coerce.number().optional(),
+    address: z.string().optional(),
     products: z.array(ProductSchema).optional(),
     formAnswers: z.array(FormAnswerSchema).optional(),
 });
@@ -148,6 +149,7 @@ export default function CustomerDetailPage() {
                     email: data.email || '',
                     phone: data.phone || '',
                     potentialRevenue: data.potentialRevenue,
+                    address: data.address || '',
                     products: data.products?.map(p => ({
                         ...p,
                         purchaseDate: p.purchaseDate ? new Date(p.purchaseDate) : new Date(),
@@ -196,6 +198,7 @@ export default function CustomerDetailPage() {
                 products: productsPayload,
                 notes: newNote.trim() ? newNote.trim() : undefined,
                 formAnswers: data.formAnswers,
+                address: data.address,
             });
 
             setNewNote('');
@@ -454,6 +457,10 @@ export default function CustomerDetailPage() {
                                 <div className="space-y-1">
                                     <Label htmlFor="jobTitle">Jabatan</Label>
                                     <Input id="jobTitle" {...form.register('jobTitle')} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="address">Alamat</Label>
+                                    <Input id="address" {...form.register('address')} />
                                 </div>
                                 <div className="space-y-1">
                                     <Label>Sumber</Label>

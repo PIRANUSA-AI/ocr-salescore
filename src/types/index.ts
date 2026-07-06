@@ -128,6 +128,7 @@ export type Customer = {
     formAnswers?: FormAnswer[];
     imageUrl?: string;
     imageKey?: string;
+    address?: string;
 };
 
 

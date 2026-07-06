@@ -16,6 +16,7 @@ export function buildExampleOutput(): string {
   "phone": {"value": "0812-3456-7890", "alternatives": ["+62 21 1234567"], "confidence": "high"},
   "email": {"value": "budi@majujaya.com", "alternatives": ["budi.s@outlook.com"], "confidence": "high"},
   "softwareNeeds": {"value": "AutoCAD", "alternatives": ["ZWCAD"], "confidence": "medium"},
+  "address": {"value": "Jl. Merdeka No. 12, Jakarta", "alternatives": [], "confidence": "high"},
   "formAnswers": [
     {"question": "Prioritas Pelanggan", "answer": "High"},
     {"question": "Bergerak dalam industri apa?", "answer": "Konstruksi"}
