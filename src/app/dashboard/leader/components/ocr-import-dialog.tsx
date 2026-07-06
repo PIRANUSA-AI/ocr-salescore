@@ -7,15 +7,16 @@ import Image from 'next/image';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, UploadCloud, ArrowLeft, Camera } from 'lucide-react';
+import { Loader2, UploadCloud, Camera, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { extractCustomerFromForm } from '@/ai/flows/extract-customer-from-form';
 import { createManualCustomer } from '@/app/actions/leader';
 import { compressImageToDataUri } from '@/lib/image-compress';
+import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CUSTOMER_SOURCES, CustomerSource } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -25,6 +26,15 @@ import { DatePicker } from '@/components/ui/date-picker';
 
 // Define a specific list of sources for OCR context
 const OCR_INTERACTION_SOURCES: CustomerSource[] = ['Pameran', 'Workshop', 'Visit', 'Training', 'Troubleshoot', 'Lainnya'];
+
+// Progressive steps shown while the AI reads the document
+const READING_STEPS = [
+    'Memproses & mengompres gambar',
+    'Menganalisis struktur dokumen',
+    'Mengenali teks (OCR)',
+    'Mengekstrak nama & kontak',
+    'Menyusun data pelanggan',
+];
 
 const FormAnswerSchema = z.object({
     question: z.string(),
@@ -55,12 +65,14 @@ interface OcrImportDialogProps {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     onCustomerAdded: () => void;
+    autoStartCamera?: boolean;
 }
 
-export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded }: OcrImportDialogProps) {
+export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, autoStartCamera = false }: OcrImportDialogProps) {
     const [status, setStatus] = useState<'idle' | 'reading' | 'mapping' | 'saving' | 'camera'>('idle');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+    const [readingStep, setReadingStep] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -88,14 +100,14 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded }: OcrIm
     }, []);
 
     const resetState = useCallback(() => {
-        setStatus('idle');
+        setStatus(autoStartCamera ? 'camera' : 'idle');
         setImagePreview(null);
         stopCamera();
         form.reset();
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    }, [form, stopCamera]);
+    }, [form, stopCamera, autoStartCamera]);
 
     // Effect to reset state when dialog closes
     useEffect(() => {
@@ -106,6 +118,13 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded }: OcrIm
             return () => clearTimeout(timer);
         }
     }, [isOpen, resetState]);
+
+    // When opening with autoStartCamera, skip upload screen and go straight to camera
+    useEffect(() => {
+        if (isOpen && autoStartCamera) {
+            setStatus('camera');
+        }
+    }, [isOpen, autoStartCamera]);
 
 
     const handleClose = () => {
@@ -249,6 +268,19 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded }: OcrIm
     }, [isOpen, status, stopCamera]);
 
 
+    // Cycle through progressive steps while the AI is reading the document
+    useEffect(() => {
+        if (status !== 'reading') {
+            setReadingStep(0);
+            return;
+        }
+        const interval = setInterval(() => {
+            setReadingStep(prev => (prev < READING_STEPS.length - 1 ? prev + 1 : prev));
+        }, 1500);
+        return () => clearInterval(interval);
+    }, [status]);
+
+
     const renderContent = () => {
         switch (status) {
             case 'camera':
@@ -270,7 +302,6 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded }: OcrIm
                                 <Button onClick={handleCaptureImage} size="lg">Ambil Gambar</Button>
                             </>
                         )}
-                        <Button variant="outline" onClick={() => setStatus('idle')}><ArrowLeft className="mr-2 h-4 w-4" /> Kembali</Button>
                     </div>
                 );
             case 'idle':
@@ -294,9 +325,31 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded }: OcrIm
                 );
             case 'reading':
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-[300px] md:min-h-[400px]">
-                        <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                        <p className="mt-4 text-muted-foreground">AI sedang membaca dokumen...</p>
+                    <div className="flex flex-col items-center justify-center min-h-[300px] md:min-h-[400px] w-full max-w-md mx-auto">
+                        <div className="w-full space-y-3">
+                            <p className="text-center text-sm font-medium text-muted-foreground mb-4">AI sedang membaca dokumen...</p>
+                            {READING_STEPS.map((label, i) => {
+                                const isDone = i < readingStep;
+                                const isActive = i === readingStep;
+                                return (
+                                    <div key={label} className={cn(
+                                        "flex items-center gap-3 rounded-md border p-3 transition-colors",
+                                        isActive ? "border-primary bg-primary/5" : isDone ? "border-transparent opacity-60" : "border-transparent opacity-40"
+                                    )}>
+                                        <span className="flex h-6 w-6 items-center justify-center flex-shrink-0">
+                                            {isDone ? (
+                                                <Check className="h-5 w-5 text-green-600" />
+                                            ) : isActive ? (
+                                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                            ) : (
+                                                <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                                            )}
+                                        </span>
+                                        <span className={cn("text-sm", isActive && "font-medium text-foreground")}>{label}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 );
             case 'mapping':
@@ -416,34 +469,34 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded }: OcrIm
         }
     };
 
+    if (!isOpen) return null;
+
     return (
-        <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-4xl grid-rows-[auto_1fr_auto]">
-                <DialogHeader>
-                    <DialogTitle>Impor Pelanggan dari Gambar (OCR)</DialogTitle>
-                    <DialogDescription>
-                        Unggah gambar kartu nama atau formulir untuk mengekstrak informasi pelanggan secara otomatis.
-                    </DialogDescription>
-                </DialogHeader>
+        <Card className="w-full mt-4">
+            <CardHeader>
+                <CardTitle>Pindai Kartu / Form (OCR)</CardTitle>
+                <CardDescription>
+                    Arahkan kamera ke kartu nama atau formulir untuk mengekstrak informasi pelanggan secara otomatis.
+                </CardDescription>
+            </CardHeader>
 
-                <div className="py-4 pr-3 overflow-y-auto" style={{ maxHeight: '75vh' }}>
-                    <canvas ref={canvasRef} className="hidden" />
-                    {renderContent()}
-                </div>
+            <CardContent>
+                <canvas ref={canvasRef} className="hidden" />
+                {renderContent()}
+            </CardContent>
 
-                <DialogFooter>
-                    {status !== 'idle' && status !== 'camera' && (
-                        <Button type="button" variant="ghost" onClick={resetState} disabled={status === 'saving' || status === 'reading'}>Mulai Ulang</Button>
-                    )}
-                    <Button type="button" variant="outline" onClick={handleClose} disabled={status === 'saving'}>Batal</Button>
-                    {(status === 'mapping' || status === 'saving') && (
-                        <Button type="submit" form="ocr-form" disabled={status === 'saving'}>
-                            {status === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Simpan Pelanggan
-                        </Button>
-                    )}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            <CardFooter className="justify-end gap-2">
+                {status !== 'idle' && status !== 'camera' && (
+                    <Button type="button" variant="ghost" onClick={resetState} disabled={status === 'saving' || status === 'reading'}>Mulai Ulang</Button>
+                )}
+                <Button type="button" variant="outline" onClick={handleClose} disabled={status === 'saving'}>Batal</Button>
+                {(status === 'mapping' || status === 'saving') && (
+                    <Button type="submit" form="ocr-form" disabled={status === 'saving'}>
+                        {status === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Simpan Pelanggan
+                    </Button>
+                )}
+            </CardFooter>
+        </Card>
     );
 }

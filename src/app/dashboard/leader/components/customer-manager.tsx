@@ -31,6 +31,7 @@ import { updatePipelineStatus } from '@/app/actions/sales';
 import { updateCustomerPriority } from '@/app/actions/customer';
 import { FadeIn } from '@/components/ui/fade-in';
 import { ExportButton } from '@/components/dashboard/export-button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const getInitials = (name: string) => {
@@ -384,11 +385,6 @@ export const CustomerManager = () => {
     return (
         <FadeIn>
             <Card>
-                <OcrImportDialog
-                    isOpen={isOcrDialogOpen}
-                    onOpenChange={setIsOcrDialogOpen}
-                    onCustomerAdded={refreshAllData}
-                />
                 <ExcelPreviewDialog
                     isOpen={isPreviewOpen}
                     onOpenChange={setIsPreviewOpen}
@@ -483,14 +479,6 @@ export const CustomerManager = () => {
                             </DropdownMenu>
                             <ExportButton team={userProfile?.team} iconOnly={isMobile} />
                             <Button
-                                size={isMobile ? "default" : "lg"}
-                                className="shadow-md shadow-primary/30"
-                                onClick={() => setIsOcrDialogOpen(true)}
-                            >
-                                OCR
-                                <ScanLine className="h-5 w-5 ml-2" />
-                            </Button>
-                            <Button
                                 variant="outline"
                                 size={isMobile ? "icon" : "default"}
                                 onClick={() => openCustomerEditDialog(null)}
@@ -500,6 +488,23 @@ export const CustomerManager = () => {
                             </Button>
                         </div>
                     </div>
+
+                    <div className="pt-4">
+                        <Button
+                            size="lg"
+                            className="h-14 w-full text-base shadow-md shadow-primary/30 active:translate-y-px"
+                            onClick={() => setIsOcrDialogOpen(true)}
+                        >
+                            <ScanLine className="h-5 w-5 mr-2" /> OCR
+                        </Button>
+                    </div>
+
+                    <OcrImportDialog
+                        isOpen={isOcrDialogOpen}
+                        onOpenChange={setIsOcrDialogOpen}
+                        onCustomerAdded={refreshAllData}
+                        autoStartCamera
+                    />
 
                     <div className='flex flex-col sm:flex-row items-start sm:items-center gap-2 pt-4'>
                         <div className="relative flex-grow w-full">
@@ -578,7 +583,24 @@ export const CustomerManager = () => {
                     {/* Mobile View */}
                     <div className="md:hidden space-y-3">
                         {isLoading ? (
-                            <div className="text-center text-muted-foreground p-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>
+                            <div className="space-y-3">
+                                {[...Array(4)].map((_, i) => (
+                                    <Card key={i} className="p-4 space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <Skeleton className="h-5 w-5 rounded mt-1" />
+                                            <div className="flex-1 space-y-2">
+                                                <Skeleton className="h-4 w-2/5" />
+                                                <Skeleton className="h-3 w-1/3" />
+                                            </div>
+                                            <Skeleton className="h-8 w-8 rounded" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Skeleton className="h-6 w-16 rounded-full" />
+                                            <Skeleton className="h-6 w-20 rounded-full" />
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
                         ) : paginatedCustomers.length > 0 ? (
                             paginatedCustomers.map(c => {
                                 const priority = getPriority(c);
@@ -719,11 +741,17 @@ export const CustomerManager = () => {
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center text-muted-foreground h-24">
-                                            <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                                        </TableCell>
-                                    </TableRow>
+                                    [...Array(6)].map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-5 w-5 rounded" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-8 w-28" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                                            <TableCell><Skeleton className="h-8 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                                        </TableRow>
+                                    ))
                                 ) : paginatedCustomers.length > 0 ? (
                                     paginatedCustomers.map((c) => {
                                         const priority = getPriority(c);
