@@ -7,8 +7,8 @@ export function createOpenAIProvider(): OcrProvider {
 
   return {
     name: `openai:${model}`,
-    async extract(imageDataUri: string): Promise<OcrResult> {
-      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri);
+    async extract(imageDataUri: string, extraContext?: string): Promise<OcrResult> {
+      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri, extraContext);
 
       try {
         const raw = await callOpenAI({

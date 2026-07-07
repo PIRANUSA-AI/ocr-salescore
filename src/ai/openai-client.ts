@@ -33,23 +33,13 @@ export async function callOpenAI<T>(params: OpenAICallParams<T>): Promise<T> {
   }
   messages.push({ role: 'user', content: userContent });
 
-  const response = await axios.post(
-    OPENAI_ENDPOINT,
-    {
-      model,
-      temperature,
-      max_tokens: maxTokens,
-      messages,
-      response_format: { type: 'json_object' },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 90000,
-    },
-  );
+  const response = await postOpenAI(buildChatCompletionsPayload({
+    model,
+    temperature,
+    maxTokens,
+    messages,
+    response_format: { type: 'json_object' },
+  }), apiKey);
 
   const raw = response.data?.choices?.[0]?.message?.content;
   if (!raw) {
@@ -90,22 +80,12 @@ export async function callOpenAIText(params: {
   }
   messages.push({ role: 'user', content: userContent });
 
-  const response = await axios.post(
-    OPENAI_ENDPOINT,
-    {
-      model,
-      temperature: params.temperature ?? 0,
-      max_tokens: params.maxTokens ?? 2048,
-      messages,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 90000,
-    },
-  );
+  const response = await postOpenAI({
+    model,
+    temperature: params.temperature ?? 0,
+    maxTokens: params.maxTokens ?? 2048,
+    messages,
+  }, apiKey);
 
   const raw = response.data?.choices?.[0]?.message?.content;
   if (!raw) {
@@ -113,4 +93,56 @@ export async function callOpenAIText(params: {
   }
 
   return raw.trim();
+}
+
+async function postOpenAI(payload: Record<string, any>, apiKey: string) {
+  if (isResponsesOnlyModel(String(payload.model || ''))) {
+    throw new Error(`OpenAI model ${payload.model} hanya support /v1/responses, bukan /v1/chat/completions.`);
+  }
+
+  const requestPayload = buildChatCompletionsPayload(payload);
+
+  try {
+    return await axios.post(
+      OPENAI_ENDPOINT,
+      requestPayload,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 90000,
+      },
+    );
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status;
+      const providerMessage = err.response?.data?.error?.message || err.response?.data?.message || JSON.stringify(err.response?.data);
+      throw new Error(`OpenAI ${status || 'request'} error (${requestPayload.model}): ${providerMessage || err.message}`);
+    }
+    throw err;
+  }
+}
+
+function buildChatCompletionsPayload(input: Record<string, any>): Record<string, any> {
+  const { maxTokens, ...payload } = input;
+  const model = String(payload.model || '');
+
+  if (usesCompletionTokens(model)) {
+    payload.max_completion_tokens = maxTokens ?? payload.max_completion_tokens ?? payload.max_tokens ?? 2048;
+    delete payload.max_tokens;
+    delete payload.temperature;
+  } else if (maxTokens !== undefined) {
+    payload.max_tokens = maxTokens;
+  }
+
+  return payload;
+}
+
+function usesCompletionTokens(model: string): boolean {
+  return /^gpt-5(\.|-|$)/.test(model) || /^o\d/.test(model);
+}
+
+function isResponsesOnlyModel(model: string): boolean {
+  return /^gpt-5-pro($|-)/.test(model) || /^gpt-5\.\d+-pro($|-)/.test(model);
 }

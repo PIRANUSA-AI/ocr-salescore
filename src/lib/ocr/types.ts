@@ -47,7 +47,7 @@ export const OCR_FIELD_LABELS: Record<string, string> = {
 
 export interface OcrProvider {
   name: string;
-  extract(imageDataUri: string): Promise<OcrResult>;
+  extract(imageDataUri: string, extraContext?: string): Promise<OcrResult>;
 }
 
 export const VALID_CONFIDENCE: Confidence[] = ['high', 'medium', 'low', 'empty'];

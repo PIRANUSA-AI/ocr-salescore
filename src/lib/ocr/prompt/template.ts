@@ -31,7 +31,16 @@ Field yang harus diekstrak: ${buildFieldList()}.
 
 `;
   if (extraContext) {
-    prompt += `Konteks tambahan: ${extraContext}\n\n`;
+    prompt += `Konteks tambahan / evidence layout:
+${extraContext}
+
+ATURAN EVIDENCE:
+- Gunakan evidence per kotak sebagai bantuan lokasi dan kandidat mentah, bukan sumber kebenaran tunggal.
+- Tetap baca ulang gambar penuh sebelum memilih nilai final.
+- Jika rawText/candidates ambigu atau terlihat salah, abaikan evidence yang buruk dan turunkan confidence.
+- Jika sebuah field tidak punya evidence jelas, kosongkan field itu.
+
+`;
   }
 
   prompt += `Kembalikan HANYA satu objek JSON valid dengan format persis seperti contoh berikut (tanpa markdown fence, tanpa teks lain):

@@ -9,12 +9,12 @@ export function createOllamaProvider(): OcrProvider {
 
   return {
     name: `ollama:${model}`,
-    async extract(imageDataUri: string): Promise<OcrResult> {
+    async extract(imageDataUri: string, extraContext?: string): Promise<OcrResult> {
       if (!apiKey) {
         throw new Error('OLLAMA_API_KEY belum diset.');
       }
 
-      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri);
+      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri, extraContext);
 
       const response = await axios.post(
         endpoint,
