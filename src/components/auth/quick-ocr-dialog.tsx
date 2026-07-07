@@ -104,6 +104,15 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
         try {
             const compressed = await compressImageToDataUri(dataUri);
             const res = await extractCustomerVision({ imageDataUri: compressed });
+            if ('rejected' in res) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Gambar tidak diproses',
+                    description: res.message,
+                });
+                resetState();
+                return;
+            }
             setImagePreview(res.imageUrl || compressed);
             setResult(res);
             setFields({

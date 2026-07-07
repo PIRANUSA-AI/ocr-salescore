@@ -219,6 +219,7 @@ function cloneOcrResult(result: ExtractResult): OcrResult {
     phone: { ...result.phone, alternatives: [...result.phone.alternatives] },
     email: { ...result.email, alternatives: [...result.email.alternatives] },
     softwareNeeds: { ...result.softwareNeeds, alternatives: [...result.softwareNeeds.alternatives] },
+    address: { ...result.address, alternatives: [...result.address.alternatives] },
     formAnswers: result.formAnswers ? result.formAnswers.map((answer) => ({ ...answer })) : undefined,
   };
 }
