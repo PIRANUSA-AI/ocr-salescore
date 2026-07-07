@@ -19,9 +19,36 @@ export function buildExampleOutput(): string {
   "address": {"value": "Jl. Merdeka No. 12, Jakarta", "alternatives": [], "confidence": "high"},
   "formAnswers": [
     {"question": "Prioritas Pelanggan", "answer": "High"},
-    {"question": "Bergerak dalam industri apa?", "answer": "Konstruksi"}
+    {"question": "Industri perusahaan?", "answer": "Kontraktor"},
+    {"question": "Apa posisi saat ini?", "answer": "Owner"},
+    {"question": "Produk apa yang paling Anda minati?", "answer": "ZWCAD, SketchUp"},
+    {"question": "Saat ini software apa yang digunakan?", "answer": "AutoCAD"},
+    {"question": "Tujuan penggunaan software?", "answer": "Gambar 2D, Desain 3D"},
+    {"question": "Berapa jumlah pengguna software di perusahaan?", "answer": "5-10"},
+    {"question": "Kapan rencana upgrade / pembelian software?", "answer": "3-6 bulan"},
+    {"question": "Apakah bersedia untuk Demo Produk?", "answer": "Ya"},
+    {"question": "Apa kendala saat ini dalam proses design", "answer": ""},
+    {"question": "Note Tambahan", "answer": ""}
   ]
 }`;
+}
+
+const FORM_QUESTIONS = [
+  'Prioritas Pelanggan',
+  'Industri perusahaan?',
+  'Apa posisi saat ini?',
+  'Produk apa yang paling Anda minati?',
+  'Saat ini software apa yang digunakan?',
+  'Tujuan penggunaan software?',
+  'Berapa jumlah pengguna software di perusahaan?',
+  'Kapan rencana upgrade / pembelian software?',
+  'Apakah bersedia untuk Demo Produk?',
+  'Apa kendala saat ini dalam proses design',
+  'Note Tambahan',
+];
+
+function buildFormChecklist(): string {
+  return FORM_QUESTIONS.map((q, i) => `${i + 1}. "${q}"`).join('\n');
 }
 
 export function buildUserPrompt(imageDataUri: string, extraContext?: string): string {
@@ -43,7 +70,13 @@ ATURAN EVIDENCE:
 `;
   }
 
-  prompt += `Kembalikan HANYA satu objek JSON valid dengan format persis seperti contoh berikut (tanpa markdown fence, tanpa teks lain):
+  prompt += `Jika gambar mengandung FORM CUSTOMER PT PIRANUSA (form berdiri sendiri atau form dengan kartu nama tertempel), formAnswers WAJIB berisi SEMUA 11 pertanyaan berikut, PERSIS, TANPA TERKECUALI — sebelum menulis JSON, cek satu per satu apakah ke-11 pertanyaan ini sudah ada di array formAnswers kamu:
+
+${buildFormChecklist()}
+
+Pertanyaan yang checkbox-nya kosong / tidak tercentang TETAP masuk sebagai entri dengan answer = "" — JANGAN dihilangkan dari array. Untuk pertanyaan checkbox dengan lebih dari satu kotak tercentang (misal CAD dan CAM sekaligus), gabungkan SEMUA yang tercentang dipisah koma — JANGAN hanya ambil satu.
+
+Kembalikan HANYA satu objek JSON valid dengan format persis seperti contoh berikut (tanpa markdown fence, tanpa teks lain):
 
 ${buildExampleOutput()}
 

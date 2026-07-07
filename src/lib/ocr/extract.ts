@@ -161,7 +161,7 @@ export async function extractCustomer(
           changed++;
         }
       }
-      if (verifiedResult.formAnswers) {
+      if (verifiedResult.formAnswers && formAnswersLookSane(result.formAnswers, verifiedResult.formAnswers)) {
         result.formAnswers = verifiedResult.formAnswers;
       }
 
@@ -208,6 +208,18 @@ function shouldAcceptReview(current: OcrField, reviewed: OcrField): boolean {
   if (!current.value) return true;
   if (reviewed.value === current.value && reviewed.confidence === current.confidence) return false;
   return isMoreConfident(reviewed.confidence, current.confidence);
+}
+
+// The verifier is text-only and never re-reads the image, so it cannot legitimately
+// re-derive checkbox marks. Only accept its formAnswers if every question it returned
+// already existed in the original array (no renamed/invented questions).
+function formAnswersLookSane(
+  original: OcrResult['formAnswers'],
+  verified: OcrResult['formAnswers'],
+): boolean {
+  if (!verified) return false;
+  const originalQuestions = new Set((original ?? []).map((qa) => qa.question));
+  return verified.every((qa) => originalQuestions.has(qa.question));
 }
 
 function cloneOcrResult(result: ExtractResult): OcrResult {

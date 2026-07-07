@@ -63,7 +63,12 @@ Gunakan PENGETAHUAN BAHASA INDONESIA Anda untuk mendeteksi OCR error:
 
 📝 ATURAN:
   - Jika kata tidak dikenal dalam Bahasa Indonesia → curigai sebagai OCR error.
-  - KOSONG > SALAH PAKSA. Jika ragu, lebih baik kosongkan.`;
+  - KOSONG > SALAH PAKSA. Jika ragu, lebih baik kosongkan.
+
+📋 FORM ANSWERS (formAnswers):
+- Anda TIDAK melihat gambar, jadi TIDAK BOLEH mengubah, mengarang, atau menebak isi checkbox/tulisan tangan.
+- JANGAN PERNAH mengubah teks "question" — kembalikan persis seperti yang diterima.
+- Boleh perbaiki ejaan Bahasa Indonesia pada "answer" jika jelas typo, TAPI jangan mengisi answer yang kosong ("") dengan tebakan apapun.`;
 }
 
 export function buildVerifierUserPrompt(primaryResult?: Record<string, any>): string {

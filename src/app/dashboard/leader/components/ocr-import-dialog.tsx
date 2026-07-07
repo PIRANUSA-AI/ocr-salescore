@@ -52,6 +52,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [result, setResult] = useState<ExtractResult | null>(null);
     const [fields, setFields] = useState<Record<string, string>>({});
+    const [formAnswers, setFormAnswers] = useState<{ question: string; answer: string }[]>([]);
     const [salesCode, setSalesCode] = useState<string>('');
     const [eventName, setEventName] = useState('IBT 2026');
     const [readingStep, setReadingStep] = useState(0);
@@ -81,6 +82,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         setImagePreview(null);
         setResult(null);
         setFields({});
+        setFormAnswers([]);
         setSalesCode('');
         setEventName('IBT 2026');
         setCreatorTeam(userProfile?.team || 'AEC');
@@ -138,6 +140,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                 softwareNeeds: res.softwareNeeds.value,
                 address: res.address.value,
             });
+            setFormAnswers(res.formAnswers || []);
             setStatus('result');
         } catch (err) {
             toast({
@@ -233,12 +236,6 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
         setStatus('saving');
         try {
-            const formAnswers = [
-                { question: 'Divisi', answer: fields.division || '' },
-                { question: 'Kebutuhan Software', answer: fields.softwareNeeds || '' },
-                { question: 'Kode Tim Sales', answer: salesCode },
-            ].filter((qa) => qa.answer);
-
             await createManualCustomer({
                 name: fields.name.trim(),
                 company: fields.company?.trim() || '',
@@ -424,6 +421,24 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                                 );
                             })}
                         </div>
+
+                        {formAnswers.length > 0 && (
+                            <div className="border-t pt-3 flex flex-col gap-2.5">
+                                <Label className="font-medium text-sm">Jawaban Form</Label>
+                                {formAnswers.map((qa, i) => (
+                                    <div key={i} className="flex flex-col gap-1">
+                                        <Label className="text-xs text-muted-foreground">{qa.question}</Label>
+                                        <Input
+                                            value={qa.answer}
+                                            onChange={(e) => setFormAnswers((prev) =>
+                                                prev.map((item, idx) => idx === i ? { ...item, answer: e.target.value } : item)
+                                            )}
+                                            disabled={status === 'saving'}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
         }

@@ -52,5 +52,13 @@ ATURAN GLOBAL:
 - Jika field terisi tapi jelas tidak masuk akal untuk field itu, kosongkan.
 - Jika ragu sebuah teks milik field mana, lebih baik tidak diisi.
 - Kosong lebih baik daripada salah paksa.
-- Jika field tidak jelas: value "", confidence "empty", alternatives [].`;
+- Jika field tidak jelas: value "", confidence "empty", alternatives [].
+
+FORM ANSWERS (formAnswers):
+- JANGAN PERNAH mengisi answer dengan pilihan yang TIDAK tercentang/ditandai secara visual.
+- JANGAN mengisi answer berdasarkan asumsi umum tentang industri/software pelanggan — hanya berdasarkan apa yang benar-benar ditandai/tertulis di gambar.
+- Untuk checkbox kosong (tidak ada satupun tercentang): answer = "", JANGAN isi dengan "-", "tidak ada", "N/A", atau menebak salah satu opsi.
+- Untuk kolom tulisan tangan kosong: answer = "", JANGAN mengarang isi.
+- Jika tercentang lebih dari satu pilihan pada pertanyaan yang seharusnya pilihan tunggal, cantumkan semua yang tercentang dipisah koma — JANGAN memilih satu secara sepihak.
+- question harus PERSIS sama dengan teks pertanyaan yang diberikan di LANGKAH 4, karakter demi karakter — JANGAN parafrase atau menyingkat.`;
 }
