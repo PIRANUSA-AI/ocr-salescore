@@ -18,11 +18,12 @@ export function buildExampleOutput(): string {
   "softwareNeeds": {"value": "AutoCAD", "alternatives": ["ZWCAD"], "confidence": "medium"},
   "address": {"value": "Jl. Merdeka No. 12, Jakarta", "alternatives": [], "confidence": "high"},
   "formAnswers": [
+    {"question": "Industri", "answer": "Kontraktor"},
     {"question": "Produk yang diminati", "answer": "ZWCAD, SketchUp"},
     {"question": "Software yang digunakan saat ini", "answer": "AutoCAD"},
     {"question": "Kapan rencana pembelian", "answer": "3-6 bulan"},
     {"question": "Tindak lanjut", "answer": "Demo"},
-    {"question": "Prioritas", "answer": "High"}
+    {"question": "Skor", "answer": "High"}
   ]
 }`;
 }
@@ -51,11 +52,12 @@ ATURAN EVIDENCE:
 2. Cari FORM / CHECKLIST di sekitar gambar. Jika ada kotak centang (checkbox) atau pertanyaan dengan tulisan tangan, ekstrak sebagai formAnswers.
 
 PERTANYAAN YANG SERING MUNCUL DI FORM (cari dan ekstrak):
+- "Industri" → cari centang pada: Arsitek, Interior Design, Kontraktor, Developer, atau Lainnya
 - "Produk yang diminati" / "Produk" → cari centang pada: ZWCAD, SketchUp, Archicad, Rendering, atau Lainnya
 - "Software yang digunakan" / "Software saat ini" → cari centang pada: AutoCAD, SketchUp, Revit, Archicad, ZWCAD, atau Lainnya
 - "Rencana pembelian" / "Kapan" → cari centang pada: <3 bulan, 3-6 bulan, >6 bulan, Belum ada
 - "Tindak lanjut" / "Follow up" → cari centang pada: Demo, Penawaran, Kunjungan, Follow-up Call
-- "Prioritas" / "Priority" → cari centang pada: High, Medium, Low
+- "Skor" → cari centang pada: High, Medium, Low
 
 Jika tidak menemukan form, formAnswers boleh dikosongkan.
 
@@ -77,11 +79,12 @@ Jika ADA pertanyaan form, ekstrak sebagai array formAnswers — setiap entri har
 - "answer": jawaban (centang / tulisan tangan)
 
 Pertanyaan yang sering muncul:
+- "Industri" → cari centang pada Arsitek, Interior Design, Kontraktor, Developer, Lainnya
 - "Produk yang diminati" → cari centang pada ZWCAD, SketchUp, Archicad, Rendering, Lainnya
 - "Software yang digunakan saat ini" → cari centang pada AutoCAD, SketchUp, Revit, Archicad, ZWCAD, Lainnya
 - "Rencana pembelian" → cari centang pada <3, 3-6, >6, Belum ada
 - "Tindak lanjut" → cari centang pada Demo, Penawaran, Kunjungan, Follow-up Call
-- "Prioritas" → cari centang pada High, Medium, Low
+- "Skor" → cari centang pada High, Medium, Low
 
 Jika TIDAK ADA pertanyaan form di slice ini, kembalikan formAnswers: [].
 

@@ -37,11 +37,12 @@ function matchOptions(answer: string, options: readonly string[]): { matched: st
   return { matched: [...new Set(matched)], other };
 }
 
+const INDUSTRI_OPTIONS = ['Arsitek', 'Interior Design', 'Kontraktor', 'Developer'] as const;
 const PRODUCT_INTEREST = ['ZWCAD', 'SketchUp', 'Archicad', 'Rendering'] as const;
 const SOFTWARE_OPTIONS = ['AutoCAD', 'SketchUp', 'Revit', 'Archicad', 'ZWCAD'] as const;
 const TIMELINE_OPTIONS = ['< 3 bulan', '3–6 bulan', '> 6 bulan', 'Belum ada'] as const;
 const FOLLOWUP_OPTIONS = ['Demo', 'Penawaran', 'Kunjungan', 'Follow-up Call'] as const;
-const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'] as const;
+const SKOR_OPTIONS = ['High', 'Medium', 'Low'] as const;
 
 const READING_STEPS = [
   'Memproses gambar',
@@ -68,13 +69,15 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
 
+  const [industri, setIndustri] = useState<string[]>([]);
+  const [otherIndustri, setOtherIndustri] = useState('');
   const [productInterest, setProductInterest] = useState<string[]>([]);
   const [otherProduct, setOtherProduct] = useState('');
   const [currentSoftware, setCurrentSoftware] = useState<string[]>([]);
   const [otherSoftware, setOtherSoftware] = useState('');
   const [purchaseTimeline, setPurchaseTimeline] = useState('');
   const [followUp, setFollowUp] = useState('');
-  const [priority, setPriority] = useState('');
+  const [skor, setSkor] = useState('');
   const [salesNotes, setSalesNotes] = useState('');
 
   const [salesCode, setSalesCode] = useState('');
@@ -106,13 +109,15 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
     setImagePreview(null);
     setResult(null);
     setFields({});
+    setIndustri([]);
+    setOtherIndustri('');
     setProductInterest([]);
     setOtherProduct('');
     setCurrentSoftware([]);
     setOtherSoftware('');
     setPurchaseTimeline('');
     setFollowUp('');
-    setPriority('');
+    setSkor('');
     setSalesNotes('');
     setSalesCode('');
     setEventName('IBT 2026');
@@ -180,6 +185,9 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         }
         return '';
       };
+      const ind = matchOptions(answerFor(['industri']), INDUSTRI_OPTIONS);
+      setIndustri(ind.matched);
+      if (ind.other) setOtherIndustri(ind.other);
       const pi = matchOptions(answerFor(['produk', 'minat']) || res.softwareNeeds.value, PRODUCT_INTEREST);
       setProductInterest(pi.matched);
       if (pi.other) setOtherProduct(pi.other);
@@ -198,10 +206,10 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
           setFollowUp(o); break;
         }
       }
-      const pr = answerFor(['prioritas', 'priority']);
-      for (const o of PRIORITY_OPTIONS) {
-        if (pr.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(pr.toLowerCase())) {
-          setPriority(o); break;
+      const sk = answerFor(['skor']);
+      for (const o of SKOR_OPTIONS) {
+        if (sk.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(sk.toLowerCase())) {
+          setSkor(o); break;
         }
       }
 
@@ -293,6 +301,9 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
       return;
     }
 
+    const selectedIndustri = industri.includes('Lainnya')
+      ? [...industri.filter(i => i !== 'Lainnya'), `Lainnya: ${otherIndustri}`].filter(Boolean)
+      : industri;
     const selectedProducts = productInterest.includes('Lainnya')
       ? [...productInterest.filter(p => p !== 'Lainnya'), `Lainnya: ${otherProduct}`].filter(Boolean)
       : productInterest;
@@ -301,11 +312,12 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
       : currentSoftware;
 
     const formAnswers = [
+      { question: 'Industri', answer: selectedIndustri.join(', ') },
       { question: 'Produk diminati', answer: selectedProducts.join(', ') },
       { question: 'Software saat ini', answer: selectedSoftware.join(', ') },
       { question: 'Rencana pembelian', answer: purchaseTimeline },
       { question: 'Tindak lanjut', answer: followUp },
-      { question: 'Prioritas', answer: priority },
+      { question: 'Skor', answer: skor },
     ].filter(qa => qa.answer);
 
     setStatus('saving');
@@ -473,6 +485,25 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
             <div className="border-t pt-3 space-y-4">
               <div className="space-y-2">
+                <Label>Industri</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {INDUSTRI_OPTIONS.map((i) => (
+                    <label key={i} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox checked={industri.includes(i)} onCheckedChange={(checked) => setIndustri(prev => checked ? [...prev, i] : prev.filter(x => x !== i))} />
+                      <span className="text-sm font-normal">{i}</span>
+                    </label>
+                  ))}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={industri.includes('Lainnya')} onCheckedChange={(checked) => setIndustri(prev => checked ? [...prev, 'Lainnya'] : prev.filter(x => x !== 'Lainnya'))} />
+                    <span className="text-sm font-normal">Lainnya</span>
+                  </label>
+                </div>
+                {industri.includes('Lainnya') && (
+                  <Input value={otherIndustri} onChange={(e) => setOtherIndustri(e.target.value)} placeholder="Sebutkan..." disabled={status === 'saving'} className="mt-1" />
+                )}
+              </div>
+
+              <div className="space-y-2">
                 <Label>Produk yang diminati</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {PRODUCT_INTEREST.map((p) => (
@@ -537,12 +568,12 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
               </div>
 
               <div className="space-y-2">
-                <Label>Prioritas</Label>
-                <RadioGroup value={priority} onValueChange={setPriority} className="flex gap-4">
-                  {PRIORITY_OPTIONS.map((p) => (
-                    <div key={p} className="flex items-center gap-2">
-                      <RadioGroupItem value={p} id={`dlg-pr-${p}`} />
-                      <Label htmlFor={`dlg-pr-${p}`} className="font-normal">{p}</Label>
+                <Label>Skor</Label>
+                <RadioGroup value={skor} onValueChange={setSkor} className="flex gap-4">
+                  {SKOR_OPTIONS.map((s) => (
+                    <div key={s} className="flex items-center gap-2">
+                      <RadioGroupItem value={s} id={`dlg-sk-${s}`} />
+                      <Label htmlFor={`dlg-sk-${s}`} className="font-normal">{s}</Label>
                     </div>
                   ))}
                 </RadioGroup>
