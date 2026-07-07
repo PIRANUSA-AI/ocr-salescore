@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import axios from 'axios';
 
-const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+
+function getOpenAIEndpoint(): string {
+  return process.env.OPENAI_ENDPOINT || DEFAULT_OPENAI_ENDPOINT;
+}
 
 export interface OpenAICallParams<T> {
   systemPrompt: string;
@@ -104,7 +108,7 @@ async function postOpenAI(payload: Record<string, any>, apiKey: string) {
 
   try {
     return await axios.post(
-      OPENAI_ENDPOINT,
+      getOpenAIEndpoint(),
       requestPayload,
       {
         headers: {
