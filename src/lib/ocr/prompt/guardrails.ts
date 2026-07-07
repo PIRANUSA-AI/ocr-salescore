@@ -20,7 +20,6 @@ NAME:
 - TIDAK BOLEH mengandung @.
 - TIDAK BOLEH hanya angka.
 - TIDAK BOLEH menerima kata yang terlihat seperti artefak OCR jika tidak jelas sebagai nama manusia.
-- Contoh artefak OCR: akhiran aneh seperti "days", "davs", "davl" pada nama satu kata.
 - Nama satu kata boleh hanya jika memang jelas terbaca sebagai nama orang.
 
 COMPANY:
@@ -56,9 +55,8 @@ ATURAN GLOBAL:
 
 FORM ANSWERS (formAnswers):
 - JANGAN PERNAH mengisi answer dengan pilihan yang TIDAK tercentang/ditandai secara visual.
-- JANGAN mengisi answer berdasarkan asumsi umum tentang industri/software pelanggan — hanya berdasarkan apa yang benar-benar ditandai/tertulis di gambar.
-- Untuk checkbox kosong (tidak ada satupun tercentang): answer = "", JANGAN isi dengan "-", "tidak ada", "N/A", atau menebak salah satu opsi.
-- Untuk kolom tulisan tangan kosong: answer = "", JANGAN mengarang isi.
-- Jika tercentang lebih dari satu pilihan pada pertanyaan yang seharusnya pilihan tunggal, cantumkan semua yang tercentang dipisah koma — JANGAN memilih satu secara sepihak.
-- question harus PERSIS sama dengan teks pertanyaan yang diberikan di LANGKAH 4, karakter demi karakter — JANGAN parafrase atau menyingkat.`;
+- JANGAN mengisi answer berdasarkan asumsi umum — hanya berdasarkan apa yang benar-benar ditandai/tertulis di gambar.
+- Untuk checkbox kosong (tidak ada satupun tercentang): answer = "".
+- Jika tercentang lebih dari satu pilihan, cantumkan semua yang tercentang dipisah koma.
+- question harus PERSIS dengan teks pertanyaan yang terbaca di gambar.`;
 }

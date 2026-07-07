@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { compressImageToDataUri } from '@/lib/image-compress';
@@ -16,27 +19,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import type { ExtractResult } from '@/lib/ocr/extract';
-import type { Confidence } from '@/lib/ocr/types';
 import type { Customer } from '@/types';
 
 const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
+function matchOptions(answer: string, options: readonly string[]): { matched: string[]; other: string } {
+  if (!answer) return { matched: [], other: '' };
+  const parts = answer.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+  const matched: string[] = [];
+  let other = '';
+  for (const part of parts) {
+    const m = part.match(/^Lainnya:\s*(.+)/i);
+    if (m) { matched.push('Lainnya'); other = m[1]; continue; }
+    if (part.toLowerCase() === 'lainnya') { matched.push('Lainnya'); continue; }
+    const exact = options.find(o => o.toLowerCase() === part.toLowerCase());
+    if (exact) { matched.push(exact); continue; }
+    other = part;
+  }
+  return { matched: [...new Set(matched)], other };
+}
+
+const PRODUCT_INTEREST = ['ZWCAD', 'SketchUp', 'Archicad', 'Rendering'] as const;
+const SOFTWARE_OPTIONS = ['AutoCAD', 'SketchUp', 'Revit', 'Archicad', 'ZWCAD'] as const;
+const TIMELINE_OPTIONS = ['< 3 bulan', '3–6 bulan', '> 6 bulan', 'Belum ada'] as const;
+const FOLLOWUP_OPTIONS = ['Demo', 'Penawaran', 'Kunjungan', 'Follow-up Call'] as const;
+const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'] as const;
+
 const READING_STEPS = [
-  'Memproses & mengompres gambar',
-  'Menganalisis struktur dokumen',
-  'Mengenali teks (OCR)',
-  'Mengekstrak nama & kontak',
-  'Menyusun data pelanggan',
+  'Memproses gambar',
+  'Membaca kartu nama',
+  'Menyiapkan form',
 ];
 
 type Status = 'idle' | 'camera' | 'reading' | 'result' | 'saving';
-
-const CONFIDENCE_STYLE: Record<Confidence, { ring: string; label: string; text: string }> = {
-  high: { ring: 'border-green-500/40 bg-green-500/5', label: 'Yakin', text: 'text-green-600' },
-  medium: { ring: 'border-yellow-500/40 bg-yellow-500/5', label: 'Kurang yakin, cek lagi', text: 'text-yellow-600' },
-  low: { ring: 'border-red-500/40 bg-red-500/5', label: 'Ragu, wajib dicek', text: 'text-red-600' },
-  empty: { ring: 'border-muted', label: 'Kosong', text: 'text-muted-foreground' },
-};
 
 interface Props {
   recentCustomers: Customer[];
@@ -51,8 +66,17 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [result, setResult] = useState<ExtractResult | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
-  const [formAnswers, setFormAnswers] = useState<{ question: string; answer: string }[]>([]);
-  const [salesCode, setSalesCode] = useState<string>('');
+
+  const [productInterest, setProductInterest] = useState<string[]>([]);
+  const [otherProduct, setOtherProduct] = useState('');
+  const [currentSoftware, setCurrentSoftware] = useState<string[]>([]);
+  const [otherSoftware, setOtherSoftware] = useState('');
+  const [purchaseTimeline, setPurchaseTimeline] = useState('');
+  const [followUp, setFollowUp] = useState('');
+  const [priority, setPriority] = useState('');
+  const [salesNotes, setSalesNotes] = useState('');
+
+  const [salesCode, setSalesCode] = useState('');
   const [eventName, setEventName] = useState('IBT 2026');
   const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
   const [readingStep, setReadingStep] = useState(0);
@@ -84,7 +108,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     setImagePreview(null);
     setResult(null);
     setFields({});
-    setFormAnswers([]);
+    setProductInterest([]);
+    setOtherProduct('');
+    setCurrentSoftware([]);
+    setOtherSoftware('');
+    setPurchaseTimeline('');
+    setFollowUp('');
+    setPriority('');
+    setSalesNotes('');
     setSalesCode('');
     setEventName('IBT 2026');
     setCreatorTeam(userProfile?.team || 'AEC');
@@ -144,9 +175,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const processImage = useCallback(async (dataUri: string) => {
     setStatus('reading');
     try {
-      // Step 1: Compress client-side → smaller base64 for server action
       const compressed = await compressImageToDataUri(dataUri);
-      // Step 2: Upload to R2 + AI analyze (server-side, one call)
       const res = await extractCustomerVision({ imageDataUri: compressed });
       if ('rejected' in res) {
         toast({
@@ -169,7 +198,40 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         softwareNeeds: res.softwareNeeds.value,
         address: res.address.value,
       });
-      setFormAnswers(res.formAnswers || []);
+
+      const fa = res.formAnswers ?? [];
+      const answerFor = (keywords: string[]) => {
+        for (const k of keywords) {
+          const match = fa.find(f => f.question.toLowerCase().includes(k));
+          if (match?.answer) return match.answer;
+        }
+        return '';
+      };
+      const pi = matchOptions(answerFor(['produk', 'minat']) || res.softwareNeeds.value, PRODUCT_INTEREST);
+      setProductInterest(pi.matched);
+      if (pi.other) setOtherProduct(pi.other);
+      const sw = matchOptions(answerFor(['software', 'saat ini', 'digunakan']) || res.softwareNeeds.value, SOFTWARE_OPTIONS);
+      setCurrentSoftware(sw.matched);
+      if (sw.other) setOtherSoftware(sw.other);
+      const tl = answerFor(['rencana', 'pembelian', 'kapan']);
+      for (const o of TIMELINE_OPTIONS) {
+        if (tl.toLowerCase().includes(o.toLowerCase().split(' ')[0]) || o.toLowerCase().includes(tl.toLowerCase())) {
+          setPurchaseTimeline(o); break;
+        }
+      }
+      const fu = answerFor(['tindak', 'follow', 'lanjut']);
+      for (const o of FOLLOWUP_OPTIONS) {
+        if (fu.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(fu.toLowerCase())) {
+          setFollowUp(o); break;
+        }
+      }
+      const pr = answerFor(['prioritas', 'priority']);
+      for (const o of PRIORITY_OPTIONS) {
+        if (pr.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(pr.toLowerCase())) {
+          setPriority(o); break;
+        }
+      }
+
       setStatus('result');
     } catch (err) {
       toast({
@@ -196,26 +258,32 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const onSave = async () => {
     if (!userProfile) return;
     if (!fields.name?.trim()) {
-      toast({ variant: 'destructive', title: 'Nama wajib diisi.' });
+      toast({ variant: 'destructive', title: 'Nama wajib diisi (dari kartu nama).' });
       return;
     }
     if (!salesCode) {
-      toast({ variant: 'destructive', title: 'Pilih kode tim sales.' });
+      toast({ variant: 'destructive', title: 'Pilih kode booth/team.' });
       return;
     }
     if (!eventName.trim()) {
       toast({ variant: 'destructive', title: 'Nama event wajib diisi.' });
       return;
     }
-    const emailValue = fields.email?.trim();
-    if (emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
-      toast({
-        variant: 'destructive',
-        title: 'Email tidak valid.',
-        description: 'Perbaiki atau kosongkan field email sebelum menyimpan.',
-      });
-      return;
-    }
+
+    const selectedProducts = productInterest.includes('Lainnya')
+      ? [...productInterest.filter(p => p !== 'Lainnya'), `Lainnya: ${otherProduct}`].filter(Boolean)
+      : productInterest;
+    const selectedSoftware = currentSoftware.includes('Lainnya')
+      ? [...currentSoftware.filter(s => s !== 'Lainnya'), `Lainnya: ${otherSoftware}`].filter(Boolean)
+      : currentSoftware;
+
+    const formAnswers = [
+      { question: 'Produk diminati', answer: selectedProducts.join(', ') },
+      { question: 'Software saat ini', answer: selectedSoftware.join(', ') },
+      { question: 'Rencana pembelian', answer: purchaseTimeline },
+      { question: 'Tindak lanjut', answer: followUp },
+      { question: 'Prioritas', answer: priority },
+    ].filter(qa => qa.answer);
 
     setStatus('saving');
     try {
@@ -230,7 +298,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         products: [],
         assignedSalesId: null,
         assignedSalesName: null,
-        notes: `Kode sales: ${salesCode}`,
+        notes: `Kode booth: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: result?.imageUrl || '',
         imageKey: '',
         acquisitionContext: {
@@ -241,7 +309,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         formAnswers,
       } as any);
 
-      toast({ title: 'Tersimpan', description: `Kontak ${fields.name} berhasil ditambahkan.` });
+      toast({ title: 'Tersimpan', description: `Lead ${fields.name} berhasil ditambahkan.` });
       reset();
       window.location.reload();
     } catch (err) {
@@ -254,20 +322,18 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     }
   };
 
-  // ============ RENDER ============
-
   if (status === 'idle') {
     return (
       <div className="flex flex-col gap-6 max-w-md mx-auto w-full">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <ScanLine className="h-5 w-5" /> Pindai Kartu / Form
+              <ScanLine className="h-5 w-5" /> Capture Lead
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <Button size="lg" className="h-20 text-base active:translate-y-px" onClick={() => setStatus('camera')}>
-              <Camera className="h-6 w-6 mr-3" /> Foto Langsung
+              <Camera className="h-6 w-6 mr-3" /> Foto Kartu Nama
             </Button>
             <Button size="lg" variant="outline" className="h-14 active:translate-y-px" onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-5 w-5 mr-2" /> Unggah Gambar
@@ -275,7 +341,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFileSelected(e)} />
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFileSelected(e)} />
             <p className="text-xs text-muted-foreground text-center pt-1">
-              Foto kartu nama atau form customer. AI akan mengekstrak datanya.
+              Foto kartu nama — data akan diekstrak otomatis.
             </p>
           </CardContent>
         </Card>
@@ -283,7 +349,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         {recentThree.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Hasil Terbaru</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Lead Terbaru</h3>
               <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.push('/dashboard?view=customer-manager')}>
                 Lihat Semua <ChevronRight className="h-3 w-3" />
               </Button>
@@ -338,7 +404,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-md mx-auto w-full gap-6">
         <div className="w-full space-y-3">
-          <p className="text-center text-sm font-medium text-muted-foreground mb-4">AI sedang membaca dokumen...</p>
+          <p className="text-center text-sm font-medium text-muted-foreground mb-4">Memproses kartu nama...</p>
           {READING_STEPS.map((label, i) => {
             const isDone = i < readingStep;
             const isActive = i === readingStep;
@@ -370,16 +436,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     );
   }
 
-  const fieldConfig: { key: string; label: string; conf: Confidence; alternatives: string[] }[] = [
-    { key: 'name', label: 'Nama', conf: result?.name.confidence ?? 'high', alternatives: result?.name.alternatives ?? [] },
-    { key: 'company', label: 'Perusahaan', conf: result?.company.confidence ?? 'high', alternatives: result?.company.alternatives ?? [] },
-    { key: 'jobTitle', label: 'Jabatan', conf: result?.jobTitle.confidence ?? 'high', alternatives: result?.jobTitle.alternatives ?? [] },
-    { key: 'division', label: 'Divisi', conf: result?.division.confidence ?? 'empty', alternatives: result?.division.alternatives ?? [] },
-    { key: 'phone', label: 'No. Telepon', conf: result?.phone.confidence ?? 'high', alternatives: result?.phone.alternatives ?? [] },
-    { key: 'email', label: 'Email', conf: result?.email.confidence ?? 'high', alternatives: result?.email.alternatives ?? [] },
-    { key: 'softwareNeeds', label: 'Kebutuhan Software', conf: result?.softwareNeeds.confidence ?? 'high', alternatives: result?.softwareNeeds.alternatives ?? [] },
-    { key: 'address', label: 'Alamat', conf: result?.address.confidence ?? 'empty', alternatives: result?.address.alternatives ?? [] },
+  const bcFields: { key: string; label: string }[] = [
+    { key: 'name', label: 'Nama' },
+    { key: 'company', label: 'Perusahaan' },
+    { key: 'jobTitle', label: 'Jabatan' },
+    { key: 'phone', label: 'Telepon' },
+    { key: 'email', label: 'Email' },
   ];
+  const hasBcData = bcFields.some(f => fields[f.key]?.trim());
 
   return (
     <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
@@ -391,14 +455,23 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Verifikasi & Lengkapi Data</CardTitle>
-          {result && result.overriddenFields.length > 0 && (
-            <p className="text-xs text-muted-foreground">Beberapa field ditinjau ulang oleh AI pembanding.</p>
-          )}
+          <CardTitle className="text-base">Qualify Lead</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent className="flex flex-col gap-4">
+          {hasBcData && (
+            <div className="rounded-md border bg-muted/20 p-3 text-sm space-y-1">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Data Kartu Nama</p>
+              {bcFields.map(f => fields[f.key]?.trim() ? (
+                <p key={f.key}><span className="text-muted-foreground">{f.label}:</span> {fields[f.key]}</p>
+              ) : null)}
+            </div>
+          )}
+          {(result?.overriddenFields?.length ?? 0) > 0 && (
+            <p className="text-xs text-muted-foreground">Beberapa field diverifikasi ulang oleh AI.</p>
+          )}
+
           <div className="flex flex-col gap-1.5 p-3 border rounded-md bg-muted/20">
-            <Label htmlFor="creatorTeam">Tim Pengguna <span className="text-red-500">*</span></Label>
+            <Label htmlFor="creatorTeam">Tim</Label>
             <Select value={creatorTeam} onValueChange={(val: any) => setCreatorTeam(val)} disabled={status === 'saving'}>
               <SelectTrigger id="creatorTeam">
                 <SelectValue placeholder="Pilih tim..." />
@@ -411,12 +484,12 @@ export function OcrCaptureView({ recentCustomers }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="eventName">Nama Event / Acara <span className="text-red-500">*</span></Label>
-            <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Contoh: Pameran MFI 2026" disabled={status === 'saving'} />
+            <Label htmlFor="eventName">Event <span className="text-red-500">*</span></Label>
+            <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Contoh: IBT 2026" disabled={status === 'saving'} />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="salesCode">Kode Tim Sales <span className="text-red-500">*</span></Label>
+            <Label htmlFor="salesCode">Kode Booth/Team <span className="text-red-500">*</span></Label>
             <div className="grid grid-cols-4 gap-2">
               {SALES_CODES.map((code) => (
                 <Button key={code} type="button" variant={salesCode === code ? 'default' : 'outline'} size="sm" className="active:translate-y-px" disabled={status === 'saving'} onClick={() => setSalesCode(code)}>
@@ -426,53 +499,88 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             </div>
           </div>
 
-          <div className="border-t pt-3 flex flex-col gap-2.5">
-            {fieldConfig.map(({ key, label, conf, alternatives }) => {
-              const style = CONFIDENCE_STYLE[conf];
-              const needsCheck = conf === 'medium' || conf === 'low';
-              const hasAlt = alternatives.length > 0;
-              return (
-                <div key={key} className={`flex flex-col gap-1 rounded-md border p-2 ${style.ring}`}>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={key} className="text-xs">{label}</Label>
-                    {needsCheck && (
-                      <span className={`text-[10px] flex items-center gap-0.5 ${style.text}`}>
-                        <AlertTriangle className="h-3 w-3" /> {style.label}
-                      </span>
-                    )}
+          <div className="border-t pt-3 space-y-4">
+            <div className="space-y-2">
+              <Label>Produk yang diminati</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {PRODUCT_INTEREST.map((p) => (
+                  <label key={p} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={productInterest.includes(p)} onCheckedChange={(checked) => setProductInterest(prev => checked ? [...prev, p] : prev.filter(x => x !== p))} />
+                    <span className="text-sm font-normal">{p}</span>
+                  </label>
+                ))}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={productInterest.includes('Lainnya')} onCheckedChange={(checked) => setProductInterest(prev => checked ? [...prev, 'Lainnya'] : prev.filter(x => x !== 'Lainnya'))} />
+                  <span className="text-sm font-normal">Lainnya</span>
+                </label>
+              </div>
+              {productInterest.includes('Lainnya') && (
+                <Input value={otherProduct} onChange={(e) => setOtherProduct(e.target.value)} placeholder="Sebutkan..." disabled={status === 'saving'} className="mt-1" />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Software yang digunakan saat ini</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {SOFTWARE_OPTIONS.map((s) => (
+                  <label key={s} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={currentSoftware.includes(s)} onCheckedChange={(checked) => setCurrentSoftware(prev => checked ? [...prev, s] : prev.filter(x => x !== s))} />
+                    <span className="text-sm font-normal">{s}</span>
+                  </label>
+                ))}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={currentSoftware.includes('Lainnya')} onCheckedChange={(checked) => setCurrentSoftware(prev => checked ? [...prev, 'Lainnya'] : prev.filter(x => x !== 'Lainnya'))} />
+                  <span className="text-sm font-normal">Lainnya</span>
+                </label>
+              </div>
+              {currentSoftware.includes('Lainnya') && (
+                <Input value={otherSoftware} onChange={(e) => setOtherSoftware(e.target.value)} placeholder="Sebutkan..." disabled={status === 'saving'} className="mt-1" />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Kapan rencana pembelian?</Label>
+              <RadioGroup value={purchaseTimeline} onValueChange={setPurchaseTimeline} className="grid grid-cols-2 gap-2">
+                {TIMELINE_OPTIONS.map((t) => (
+                  <div key={t} className="flex items-center gap-2">
+                    <RadioGroupItem value={t} id={`tl-${t}`} />
+                    <Label htmlFor={`tl-${t}`} className="font-normal">{t}</Label>
                   </div>
-                  <Input id={key} value={fields[key] || ''} onChange={(e) => setFields((p) => ({ ...p, [key]: e.target.value }))} disabled={status === 'saving'} className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0" />
-                  {hasAlt && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {alternatives.map((alt, i) => (
-                        <button key={i} type="button" onClick={() => setFields((p) => ({ ...p, [key]: alt }))} className="text-[11px] px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
-                          {alt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                ))}
+              </RadioGroup>
+            </div>
           </div>
 
-          {formAnswers.length > 0 && (
-            <div className="border-t pt-3 flex flex-col gap-2.5">
-              <Label className="font-medium text-sm">Jawaban Form</Label>
-              {formAnswers.map((qa, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">{qa.question}</Label>
-                  <Input
-                    value={qa.answer}
-                    onChange={(e) => setFormAnswers((prev) =>
-                      prev.map((item, idx) => idx === i ? { ...item, answer: e.target.value } : item)
-                    )}
-                    disabled={status === 'saving'}
-                  />
-                </div>
-              ))}
+          <div className="border-t pt-3 space-y-3">
+            <div className="space-y-2">
+              <Label>Tindak lanjut</Label>
+              <RadioGroup value={followUp} onValueChange={setFollowUp} className="grid grid-cols-2 gap-2">
+                {FOLLOWUP_OPTIONS.map((f) => (
+                  <div key={f} className="flex items-center gap-2">
+                    <RadioGroupItem value={f} id={`fu-${f}`} />
+                    <Label htmlFor={`fu-${f}`} className="font-normal">{f}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
             </div>
-          )}
+
+            <div className="space-y-2">
+              <Label>Prioritas</Label>
+              <RadioGroup value={priority} onValueChange={setPriority} className="flex gap-4">
+                {PRIORITY_OPTIONS.map((p) => (
+                  <div key={p} className="flex items-center gap-2">
+                    <RadioGroupItem value={p} id={`pr-${p}`} />
+                    <Label htmlFor={`pr-${p}`} className="font-normal">{p}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="salesNotes">Catatan Sales</Label>
+              <Textarea id="salesNotes" value={salesNotes} onChange={(e) => setSalesNotes(e.target.value)} placeholder="Kendala / kebutuhan / catatan lain..." disabled={status === 'saving'} rows={3} />
+            </div>
+          </div>
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" className="flex-1" onClick={reset} disabled={status === 'saving'}>
@@ -480,7 +588,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             </Button>
             <Button className="flex-1" onClick={onSave} disabled={status === 'saving'}>
               {status === 'saving' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-              Simpan
+              Simpan Lead
             </Button>
           </div>
         </CardContent>
@@ -490,7 +598,9 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 }
 
 function RecentCard({ customer, onClick }: { customer: Customer; onClick: () => void }) {
-  const salesCode = customer.formAnswers?.find((qa) => qa.question.toLowerCase().includes('kode'))?.answer;
+  const salesCode = customer.notes && typeof customer.notes === 'object' && 'manual' in customer.notes
+    ? (customer.notes as any).manual?.match(/Kode (?:booth|sales): (\S+)/)?.[1]
+    : null;
   const timeAgo = customer.createdAt ? getTimeAgo(customer.createdAt) : '';
   return (
     <button

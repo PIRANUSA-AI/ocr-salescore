@@ -18,41 +18,17 @@ export function buildExampleOutput(): string {
   "softwareNeeds": {"value": "AutoCAD", "alternatives": ["ZWCAD"], "confidence": "medium"},
   "address": {"value": "Jl. Merdeka No. 12, Jakarta", "alternatives": [], "confidence": "high"},
   "formAnswers": [
-    {"question": "Prioritas Pelanggan", "answer": "High"},
-    {"question": "Industri perusahaan?", "answer": "Kontraktor"},
-    {"question": "Apa posisi saat ini?", "answer": "Owner"},
-    {"question": "Produk apa yang paling Anda minati?", "answer": "ZWCAD, SketchUp"},
-    {"question": "Saat ini software apa yang digunakan?", "answer": "AutoCAD"},
-    {"question": "Tujuan penggunaan software?", "answer": "Gambar 2D, Desain 3D"},
-    {"question": "Berapa jumlah pengguna software di perusahaan?", "answer": "5-10"},
-    {"question": "Kapan rencana upgrade / pembelian software?", "answer": "3-6 bulan"},
-    {"question": "Apakah bersedia untuk Demo Produk?", "answer": "Ya"},
-    {"question": "Apa kendala saat ini dalam proses design", "answer": ""},
-    {"question": "Note Tambahan", "answer": ""}
+    {"question": "Produk yang diminati", "answer": "ZWCAD, SketchUp"},
+    {"question": "Software yang digunakan saat ini", "answer": "AutoCAD"},
+    {"question": "Kapan rencana pembelian", "answer": "3-6 bulan"},
+    {"question": "Tindak lanjut", "answer": "Demo"},
+    {"question": "Prioritas", "answer": "High"}
   ]
 }`;
 }
 
-const FORM_QUESTIONS = [
-  'Prioritas Pelanggan',
-  'Industri perusahaan?',
-  'Apa posisi saat ini?',
-  'Produk apa yang paling Anda minati?',
-  'Saat ini software apa yang digunakan?',
-  'Tujuan penggunaan software?',
-  'Berapa jumlah pengguna software di perusahaan?',
-  'Kapan rencana upgrade / pembelian software?',
-  'Apakah bersedia untuk Demo Produk?',
-  'Apa kendala saat ini dalam proses design',
-  'Note Tambahan',
-];
-
-function buildFormChecklist(): string {
-  return FORM_QUESTIONS.map((q, i) => `${i + 1}. "${q}"`).join('\n');
-}
-
 export function buildUserPrompt(imageDataUri: string, extraContext?: string): string {
-  let prompt = `Analisis gambar FORM CUSTOMER / KARTU NAMA ini dengan saksama.
+  let prompt = `Analisis gambar KARTU NAMA / FORM CUSTOMER ini dengan saksama.
 
 Field yang harus diekstrak: ${buildFieldList()}.
 
@@ -70,11 +46,18 @@ ATURAN EVIDENCE:
 `;
   }
 
-  prompt += `Jika gambar mengandung FORM CUSTOMER PT PIRANUSA (form berdiri sendiri atau form dengan kartu nama tertempel), formAnswers WAJIB berisi SEMUA 11 pertanyaan berikut, PERSIS, TANPA TERKECUALI — sebelum menulis JSON, cek satu per satu apakah ke-11 pertanyaan ini sudah ada di array formAnswers kamu:
+  prompt += `PRIORITAS UTAMA:
+1. Ekstrak data dari KARTU NAMA (name, company, jobTitle, phone, email, address).
+2. Cari FORM / CHECKLIST di sekitar gambar. Jika ada kotak centang (checkbox) atau pertanyaan dengan tulisan tangan, ekstrak sebagai formAnswers.
 
-${buildFormChecklist()}
+PERTANYAAN YANG SERING MUNCUL DI FORM (cari dan ekstrak):
+- "Produk yang diminati" / "Produk" → cari centang pada: ZWCAD, SketchUp, Archicad, Rendering, atau Lainnya
+- "Software yang digunakan" / "Software saat ini" → cari centang pada: AutoCAD, SketchUp, Revit, Archicad, ZWCAD, atau Lainnya
+- "Rencana pembelian" / "Kapan" → cari centang pada: <3 bulan, 3-6 bulan, >6 bulan, Belum ada
+- "Tindak lanjut" / "Follow up" → cari centang pada: Demo, Penawaran, Kunjungan, Follow-up Call
+- "Prioritas" / "Priority" → cari centang pada: High, Medium, Low
 
-Pertanyaan yang checkbox-nya kosong / tidak tercentang TETAP masuk sebagai entri dengan answer = "" — JANGAN dihilangkan dari array. Untuk pertanyaan checkbox dengan lebih dari satu kotak tercentang (misal CAD dan CAM sekaligus), gabungkan SEMUA yang tercentang dipisah koma — JANGAN hanya ambil satu.
+Jika tidak menemukan form, formAnswers boleh dikosongkan.
 
 Kembalikan HANYA satu objek JSON valid dengan format persis seperti contoh berikut (tanpa markdown fence, tanpa teks lain):
 
@@ -83,4 +66,24 @@ ${buildExampleOutput()}
 WAJIB: Gunakan nilai confidence yang jujur. Jangan menebak.`;
 
   return prompt;
+}
+
+export function buildSliceFormPrompt(): string {
+  return `Anda melihat sepotong (slice) dari form customer PT PIRANUSA.
+Tugas Anda: deteksi apakah ada pertanyaan form, checkbox, atau tulisan tangan di gambar ini.
+
+Jika ADA pertanyaan form, ekstrak sebagai array formAnswers — setiap entri harus memiliki:
+- "question": teks pertanyaan persis seperti yang tercetak
+- "answer": jawaban (centang / tulisan tangan)
+
+Pertanyaan yang sering muncul:
+- "Produk yang diminati" → cari centang pada ZWCAD, SketchUp, Archicad, Rendering, Lainnya
+- "Software yang digunakan saat ini" → cari centang pada AutoCAD, SketchUp, Revit, Archicad, ZWCAD, Lainnya
+- "Rencana pembelian" → cari centang pada <3, 3-6, >6, Belum ada
+- "Tindak lanjut" → cari centang pada Demo, Penawaran, Kunjungan, Follow-up Call
+- "Prioritas" → cari centang pada High, Medium, Low
+
+Jika TIDAK ADA pertanyaan form di slice ini, kembalikan formAnswers: [].
+
+Kembalikan HANYA JSON: {"formAnswers": [{"question": "...", "answer": "..."}]}`;
 }

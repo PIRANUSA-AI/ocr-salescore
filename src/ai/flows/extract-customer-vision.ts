@@ -3,6 +3,10 @@
 import { extractCustomer, type ExtractResult } from '@/lib/ocr/extract';
 import { uploadOcrImage, getPresignedUrl } from '@/lib/r2';
 import { assertRelevantOcrImage, OcrPreflightRejectError } from '@/lib/ocr/preflight';
+import { sliceImage } from '@/lib/ocr/image-slicer';
+import { callOpenAI } from '@/ai/openai-client';
+import { buildSliceFormPrompt } from '@/lib/ocr/prompt/template';
+import { z } from 'zod';
 
 export type { ExtractResult } from '@/lib/ocr/extract';
 
@@ -15,6 +19,13 @@ export interface OcrRejectedResult {
 
 export type ExtractCustomerVisionResult = ExtractResult | OcrRejectedResult;
 
+const SliceFormSchema = z.object({
+  formAnswers: z.array(z.object({
+    question: z.string(),
+    answer: z.string(),
+  })),
+});
+
 /**
  * OCR flow: upload image to R2, then analyze.
  *
@@ -23,6 +34,7 @@ export type ExtractCustomerVisionResult = ExtractResult | OcrRejectedResult;
  * 3. Server generates presigned URL for AI + display
  * 4. AI primary (gpt-4.1) fetches from presigned URL
  * 5. AI verifier (gpt-5-nano) reviews text only — no image
+ * 6. If formAnswers empty, slice image and re-scan each slice for form fields
  */
 export async function extractCustomerVision(input: {
   imageDataUri: string;
@@ -63,6 +75,51 @@ export async function extractCustomerVision(input: {
       alwaysSecondOpinion: input.alwaysSecondOpinion,
     });
     result.imageUrl = imageUrl;
+
+    // Step 4: If formAnswers is empty, try slicing image and scanning each slice
+    const hasFormAnswers = result.formAnswers && result.formAnswers.length > 0;
+    if (!hasFormAnswers) {
+      console.log('[OCR] No form answers detected, trying image slicing...');
+      try {
+        const slices = await sliceImage(input.imageDataUri, 5, 0.1);
+        console.log(`[OCR] Sliced into ${slices.length} pieces`);
+
+        const allAnswers: { question: string; answer: string }[] = [];
+        const seenQuestions = new Set<string>();
+
+        for (const slice of slices) {
+          try {
+            const sliceResult = await callOpenAI({
+              systemPrompt: buildSliceFormPrompt(),
+              userPrompt: 'Ekstrak form answers dari slice gambar ini.',
+              schema: SliceFormSchema,
+              model: process.env.OPENAI_OCR_MODEL || 'gpt-4.1',
+              temperature: 0,
+              maxTokens: 1024,
+              imageDataUri: slice.dataUri,
+            });
+
+            for (const fa of sliceResult.formAnswers ?? []) {
+              const key = fa.question.toLowerCase().trim();
+              if (fa.answer && !seenQuestions.has(key)) {
+                seenQuestions.add(key);
+                allAnswers.push(fa);
+              }
+            }
+          } catch (sliceErr) {
+            console.warn(`[OCR] Slice ${slice.index} failed:`, sliceErr instanceof Error ? sliceErr.message : sliceErr);
+          }
+        }
+
+        if (allAnswers.length > 0) {
+          console.log(`[OCR] Slice scanning found ${allAnswers.length} form answers`);
+          result.formAnswers = allAnswers;
+        }
+      } catch (sliceErr) {
+        console.warn('[OCR] Image slicing failed, continuing without:', sliceErr instanceof Error ? sliceErr.message : sliceErr);
+      }
+    }
+
     console.log(`[OCR] done in ${result.elapsedMs}ms`);
     return result;
   } catch (error) {
