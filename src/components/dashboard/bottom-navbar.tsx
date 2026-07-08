@@ -42,8 +42,8 @@ export function BottomNavbar({ activeView, onViewChange }: BottomNavbarProps) {
           const isActive =
             item.id === 'profile'
               ? activeView === 'profile'
-              : item.id === 'customer-manager'
-                ? activeView === 'customer-manager' || activeView === 'my-customers'
+              : item.id === 'customer-manager' || item.id === 'global-customers'
+                ? activeView === 'customer-manager' || activeView === 'my-customers' || activeView === 'global-customers'
                 : activeView === item.id;
 
           return (

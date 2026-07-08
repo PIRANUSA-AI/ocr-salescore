@@ -10,7 +10,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, ShieldAlert, Users, UserPlus, Send } from "lucide-react";
+import { Search, ShieldAlert, Send } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { type Customer } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { EmailBlastDialog } from '../leader/components/email-blast-dialog';
 import { FadeIn } from '@/components/ui/fade-in';
 import { ExportButton } from '@/components/dashboard/export-button';
+import { useMediaQuery } from '@/hooks/use-media-query';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
 const formatCurrency = (value: number | null | undefined) => {
     if (value === null || value === undefined) return 'N/A';
@@ -56,7 +59,8 @@ export const GlobalCustomerManager = () => {
     const { toast } = useToast();
     const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
     const [isBlastEmailOpen, setIsBlastEmailOpen] = useState(false);
-    const ITEMS_PER_PAGE = 20;
+    const [itemsPerPage, setItemsPerPage] = useState(20);
+    const isMobile = useMediaQuery("(max-width: 768px)");
 
     useEffect(() => {
         setIsLoading(true);
@@ -84,12 +88,10 @@ export const GlobalCustomerManager = () => {
     }, [customers, searchTerm]);
 
     const paginatedCustomers = useMemo(() => {
-        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-        const endIndex = startIndex + ITEMS_PER_PAGE;
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
         return filteredCustomers.slice(startIndex, endIndex);
-    }, [filteredCustomers, currentPage]);
-
-    const pageCount = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+    }, [filteredCustomers, currentPage, itemsPerPage]);
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
@@ -124,148 +126,203 @@ export const GlobalCustomerManager = () => {
             <FadeIn>
                 <Card>
                     <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                <span className="font-headline text-3xl font-bold">Manajemen Pelanggan Global</span>
-                                {!isLoading && (
-                                    <Badge variant="default">{customers.length} Customers</Badge>
-                                )}
-                            </CardTitle>
-                            <div className='flex items-center gap-2'>
+                        {/* Title row */}
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                                <CardTitle className="flex items-center gap-2">
+                                    <span className="font-headline text-xl sm:text-2xl md:text-3xl font-bold truncate">Manajemen Pelanggan Global</span>
+                                    {!isLoading && (
+                                        <Badge variant="default">{customers.length}</Badge>
+                                    )}
+                                </CardTitle>
+                                <CardDescription className="mt-1">Tinjau semua data pelanggan dari seluruh tim dan divisi.</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
                                 <ExportButton />
-                                {selectedCustomers.length > 0 ? (
-                                    <>
-                                        <span className="text-sm font-medium text-muted-foreground">{selectedCustomers.length} dipilih</span>
-                                        <Button variant="outline" onClick={() => setIsBlastEmailOpen(true)}>
-                                            <Send className="mr-2 h-4 w-4" />
-                                            Email Blast
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Search className='w-4 h-4 text-muted-foreground' />
-                                        <Input
-                                            placeholder='Cari pelanggan, perusahaan, atau sales...'
-                                            className='max-w-sm'
-                                            value={searchTerm}
-                                            onChange={(e) => {
-                                                setSearchTerm(e.target.value);
-                                                setCurrentPage(1);
-                                            }}
-                                        />
-                                    </>
-                                )}
                             </div>
                         </div>
-                        <CardDescription>Tinjau semua data pelanggan dari seluruh tim dan divisi.</CardDescription>
+                        {/* Search row */}
+                        <div className="flex items-center gap-2 pt-1">
+                            <div className="relative flex-1 min-w-0">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Cari pelanggan, perusahaan, atau sales..."
+                                    className="w-full pl-9 h-9"
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        {/* Bulk action bar */}
+                        {selectedCustomers.length > 0 && (
+                            <div className="flex items-center gap-2 text-sm">
+                                <span className="text-muted-foreground">{selectedCustomers.length} dipilih</span>
+                                <Button variant="outline" size="sm" onClick={() => setIsBlastEmailOpen(true)}>
+                                    <Send className="mr-2 h-4 w-4" />
+                                    Email Blast
+                                </Button>
+                            </div>
+                        )}
                     </CardHeader>
                     <CardContent>
-                        <div className="border rounded-md">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[50px]">
-                                            <Checkbox
-                                                onCheckedChange={handleSelectAll}
-                                                checked={paginatedCustomers.length > 0 && selectedCustomers.length === paginatedCustomers.length}
-                                                indeterminate={selectedCustomers.length > 0 && selectedCustomers.length < paginatedCustomers.length}
-                                            />
-                                        </TableHead>
-                                        <TableHead>Pelanggan</TableHead>
-                                        <TableHead>Prioritas</TableHead>
-                                        <TableHead>Tim</TableHead>
-                                        <TableHead>Status Pipeline</TableHead>
-                                        <TableHead>Potensi Pendapatan</TableHead>
-                                        <TableHead>Sales Ditugaskan</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {isLoading ? (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="text-center text-muted-foreground h-24">
-                                                <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : paginatedCustomers.length > 0 ? (
-                                        paginatedCustomers.map((c) => {
-                                            const priority = getPriority(c);
-                                            return (
-                                                <TableRow key={c.id} data-state={selectedCustomers.includes(c.id) ? "selected" : ""}>
-                                                    <TableCell>
-                                                        <Checkbox
-                                                            checked={selectedCustomers.includes(c.id)}
-                                                            onCheckedChange={(checked) => handleSelectRow(c.id, !!checked)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="font-medium">{c.name}</div>
-                                                        <div className="text-xs text-muted-foreground">{c.company}</div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {priority.level && (
-                                                            <Badge variant={priority.variant}>
-                                                                <ShieldAlert className="mr-1.5 h-3 w-3" />
-                                                                {priority.level}
+                        {isMobile ? (
+                            /* Mobile card list */
+                            <div className="space-y-2">
+                                {isLoading ? (
+                                    [...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)
+                                ) : paginatedCustomers.length > 0 ? (
+                                    paginatedCustomers.map((c) => {
+                                        const priority = getPriority(c);
+                                        return (
+                                            <div
+                                                key={c.id}
+                                                data-state={selectedCustomers.includes(c.id) ? "selected" : ""}
+                                                className="p-3 border rounded-lg"
+                                            >
+                                                <div className="flex items-start gap-2">
+                                                    <Checkbox
+                                                        className="mt-0.5 shrink-0"
+                                                        checked={selectedCustomers.includes(c.id)}
+                                                        onCheckedChange={(checked) => handleSelectRow(c.id, !!checked)}
+                                                    />
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0">
+                                                                <div className="font-medium text-sm truncate">{c.name}</div>
+                                                                <div className="text-xs text-muted-foreground truncate">{c.company || '-'}</div>
+                                                            </div>
+                                                            {priority.level && (
+                                                                <Badge variant={priority.variant} className="shrink-0">
+                                                                    <ShieldAlert className="mr-1.5 h-3 w-3" />
+                                                                    {priority.level}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                                            <Badge variant={c.pipelineStatus === 'Won' ? 'default' : (c.pipelineStatus === 'Lost' ? 'destructive' : 'secondary')}>
+                                                                {c.pipelineStatus}
                                                             </Badge>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {c.team ? <Badge variant="outline">{c.team}</Badge> : <span className='text-xs text-muted-foreground'>N/A</span>}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant={c.pipelineStatus === 'Won' ? 'default' : (c.pipelineStatus === 'Lost' ? 'destructive' : 'secondary')}
-                                                            className="w-fit"
-                                                        >
-                                                            {c.pipelineStatus}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className='text-sm font-medium'>{formatCurrency(c.potentialRevenue)}</span>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {c.assignedSalesName ? (
-                                                            <Badge variant="outline">{c.assignedSalesName}</Badge>
-                                                        ) : (
-                                                            <span className='text-xs text-muted-foreground'>Belum Ditugaskan</span>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            )
-                                        })
-                                    ) : (
+                                                            {c.team && <Badge variant="outline">{c.team}</Badge>}
+                                                            {c.assignedSalesName ? (
+                                                                <Badge variant="outline">{c.assignedSalesName}</Badge>
+                                                            ) : (
+                                                                <span className="text-[11px] text-muted-foreground">Belum Ditugaskan</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs font-medium mt-1.5">{formatCurrency(c.potentialRevenue)}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-center text-muted-foreground py-12 border rounded-lg text-sm">
+                                        Belum ada data pelanggan.
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            /* Desktop table */
+                            <div className="border rounded-md overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={7} className="text-center text-muted-foreground h-24">
-                                                Belum ada data pelanggan.
-                                            </TableCell>
+                                            <TableHead className="w-[50px]">
+                                                <Checkbox
+                                                    onCheckedChange={handleSelectAll}
+                                                    checked={paginatedCustomers.length > 0 && selectedCustomers.length === paginatedCustomers.length}
+                                                    indeterminate={selectedCustomers.length > 0 && selectedCustomers.length < paginatedCustomers.length}
+                                                />
+                                            </TableHead>
+                                            <TableHead>Pelanggan</TableHead>
+                                            <TableHead>Prioritas</TableHead>
+                                            <TableHead>Tim</TableHead>
+                                            <TableHead>Status Pipeline</TableHead>
+                                            <TableHead>Potensi Pendapatan</TableHead>
+                                            <TableHead>Sales Ditugaskan</TableHead>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                        <div className="flex items-center justify-between pt-4">
-                            <div className="text-sm text-muted-foreground">
-                                Halaman {currentPage} dari {pageCount || 1}
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isLoading ? (
+                                            [...Array(6)].map((_, i) => (
+                                                <TableRow key={i}>
+                                                    <TableCell><Skeleton className="h-4 w-4 rounded" /></TableCell>
+                                                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                                                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                                                    <TableCell><Skeleton className="h-5 w-12" /></TableCell>
+                                                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : paginatedCustomers.length > 0 ? (
+                                            paginatedCustomers.map((c) => {
+                                                const priority = getPriority(c);
+                                                return (
+                                                    <TableRow key={c.id} data-state={selectedCustomers.includes(c.id) ? "selected" : ""}>
+                                                        <TableCell>
+                                                            <Checkbox
+                                                                checked={selectedCustomers.includes(c.id)}
+                                                                onCheckedChange={(checked) => handleSelectRow(c.id, !!checked)}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="font-medium">{c.name}</div>
+                                                            <div className="text-xs text-muted-foreground">{c.company}</div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {priority.level && (
+                                                                <Badge variant={priority.variant}>
+                                                                    <ShieldAlert className="mr-1.5 h-3 w-3" />
+                                                                    {priority.level}
+                                                                </Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {c.team ? <Badge variant="outline">{c.team}</Badge> : <span className='text-xs text-muted-foreground'>N/A</span>}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                variant={c.pipelineStatus === 'Won' ? 'default' : (c.pipelineStatus === 'Lost' ? 'destructive' : 'secondary')}
+                                                                className="w-fit"
+                                                            >
+                                                                {c.pipelineStatus}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <span className='text-sm font-medium'>{formatCurrency(c.potentialRevenue)}</span>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {c.assignedSalesName ? (
+                                                                <Badge variant="outline">{c.assignedSalesName}</Badge>
+                                                            ) : (
+                                                                <span className='text-xs text-muted-foreground'>Belum Ditugaskan</span>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )
+                                            })
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="text-center text-muted-foreground h-24">
+                                                    Belum ada data pelanggan.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, pageCount))}
-                                    disabled={currentPage === pageCount}
-                                >
-                                    Selanjutnya
-                                </Button>
-                            </div>
-                        </div>
+                        )}
+                        <DataTablePagination
+                            totalItems={filteredCustomers.length}
+                            itemsPerPage={itemsPerPage}
+                            currentPage={currentPage}
+                            onPageChange={setCurrentPage}
+                            onItemsPerPageChange={(v) => { setItemsPerPage(v); setCurrentPage(1); }}
+                        />
                     </CardContent>
                 </Card>
             </FadeIn>

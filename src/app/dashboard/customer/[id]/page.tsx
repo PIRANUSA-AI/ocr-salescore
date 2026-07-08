@@ -131,6 +131,9 @@ export default function CustomerDetailPage() {
         name: "formAnswers"
     });
 
+    const watchedEmail = form.watch('email');
+    const watchedPhone = form.watch('phone');
+
 
     // --- DATA FETCHING ---
 
@@ -237,13 +240,6 @@ export default function CustomerDetailPage() {
         navigator.clipboard.writeText(text);
         toast({ title: 'Tersalin!', description: 'Pesan telah disalin ke clipboard.' });
     }
-
-    const handleEmailClick = (e: React.MouseEvent, email: string) => {
-        e.preventDefault();
-        if (email) {
-            setEmailClientState({ isOpen: true, email: email });
-        }
-    };
 
 
     // --- TIMELINE LOGIC (Memoized) ---
@@ -471,30 +467,38 @@ export default function CustomerDetailPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="email">Email</Label>
-                                    <button onClick={(e) => handleEmailClick(e, form.getValues('email') || '')} className="flex items-center gap-2 text-primary hover:underline w-full text-left">
-                                        <Mail className="h-4 w-4" />
-                                        <Controller
-                                            name="email"
-                                            control={form.control}
-                                            render={({ field }) => (
-                                                <span className="flex-1">{field.value}</span>
-                                            )}
-                                        />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <Input id="email" type="email" {...form.register('email')} className="flex-1" />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9 shrink-0"
+                                            onClick={() => setEmailClientState({ isOpen: true, email: watchedEmail || '' })}
+                                            disabled={!watchedEmail}
+                                        >
+                                            <Mail className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                     {form.formState.errors.email && <p className="text-xs text-destructive mt-1">{form.formState.errors.email.message}</p>}
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="phone">Telepon</Label>
-                                    <a href={formatWaLink(customer.phone)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline">
-                                        <Phone className="h-4 w-4" />
-                                        <Controller
-                                            name="phone"
-                                            control={form.control}
-                                            render={({ field }) => (
-                                                <span className="flex-1">{field.value}</span>
-                                            )}
-                                        />
-                                    </a>
+                                    <div className="flex items-center gap-2">
+                                        <Input id="phone" {...form.register('phone')} className="flex-1" />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9 shrink-0"
+                                            asChild
+                                            disabled={!watchedPhone}
+                                        >
+                                            <a href={formatWaLink(watchedPhone)} target="_blank" rel="noopener noreferrer">
+                                                <Phone className="h-4 w-4" />
+                                            </a>
+                                        </Button>
+                                    </div>
                                 </div>
                                 <Separator />
                                 <div className="space-y-2">
