@@ -2,34 +2,41 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { getReportData, type ReportData } from '@/app/actions/report';
-import { Loader2, Users, UserPlus, DollarSign, TrendingUp } from 'lucide-react';
+import {
+  getOcrReportData,
+  type OcrReportData,
+  type OcrTimeRange,
+  type OcrTeamFilter,
+} from '@/app/actions/report';
+import { Loader2, ScanLine, Zap, UserX, Trophy } from 'lucide-react';
 import { MetricCard } from '@/components/ui/metric-card';
 import { PageHeader } from '@/components/ui/page-header';
-import { RevenueTrendChart } from './revenue-trend-chart';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
+import { OcrSalesRanking } from './ocr-sales-ranking';
+import { OcrFunnel } from './ocr-funnel';
+import { OcrDataQuality } from './ocr-data-quality';
+import { OcrReportExport } from './ocr-report-export';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FadeIn } from '@/components/ui/fade-in';
-import { AnalyticsExportButton } from '@/components/dashboard/analytics-export-button';
-import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
-const getInitials = (name: string) => {
-  if (!name || name === 'Belum Ditugaskan') return '??';
-  const names = name.split(' ');
-  if (names.length > 1) return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
-  return name.substring(0, 2).toUpperCase();
-};
+const RANGE_OPTIONS: { value: OcrTimeRange; label: string }[] = [
+  { value: 'today', label: 'Hari Ini' },
+  { value: '7d', label: '7 Hari' },
+  { value: '30d', label: '30 Hari' },
+  { value: 'all', label: 'Semua' },
+];
 
 function Skeleton() {
   return (
     <div className="space-y-6 animate-pulse">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-28 rounded-lg bg-muted" />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 h-80 rounded-lg bg-muted" />
+        <div className="lg:col-span-1 h-80 rounded-lg bg-muted" />
+        <div className="h-80 rounded-lg bg-muted" />
         <div className="h-80 rounded-lg bg-muted" />
       </div>
     </div>
@@ -38,127 +45,125 @@ function Skeleton() {
 
 export default function ReportPage() {
   const { userProfile } = useAuth();
-  const [data, setData] = useState<ReportData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const isSuperadmin = userProfile?.role === 'Superadmin';
+  const [ocrRange, setOcrRange] = useState<OcrTimeRange>('30d');
+  const [ocrTeam, setOcrTeam] = useState<OcrTeamFilter>('all');
+  const [ocrData, setOcrData] = useState<OcrReportData | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(true);
 
   useEffect(() => {
-    if (userProfile) {
-      setIsLoading(true);
-      getReportData(userProfile)
-        .then(setData)
-        .catch((err) => {
-          console.error(err);
-          setError('Gagal memuat data laporan.');
-        })
-        .finally(() => setIsLoading(false));
-    }
-  }, [userProfile]);
+    if (!userProfile) return;
+    setOcrLoading(true);
+    getOcrReportData(userProfile, ocrRange, ocrTeam)
+      .then(setOcrData)
+      .catch((err) => {
+        console.error('[OCR Report]', err);
+        setOcrData(null);
+      })
+      .finally(() => setOcrLoading(false));
+  }, [userProfile, ocrRange, ocrTeam]);
 
-  const calculateChange = (current: number, previous: number) => {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return ((current - previous) / previous) * 100;
-  };
+  if (ocrLoading && !ocrData) return <Skeleton />;
+  if (!ocrData) {
+    return <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">Gagal memuat data laporan.</div>;
+  }
 
-  if (isLoading) return <Skeleton />;
-  if (error) return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error}</div>;
-  if (!data) return <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">Tidak ada data untuk ditampilkan.</div>;
-
-  const { stats, salesDistribution } = data;
-  const totalCustomersForDistribution = salesDistribution.reduce((acc, curr) => acc + curr.customerCount, 0);
-
-  const formatCurrency = (v: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
+  // Label & param untuk export
+  const periodeLabel = RANGE_OPTIONS.find((o) => o.value === ocrRange)?.label || ocrRange;
+  const timLabel =
+    userProfile?.role === 'Leader'
+      ? `Tim ${userProfile.team}`
+      : ocrTeam === 'all'
+      ? 'Semua Tim'
+      : `Tim ${ocrTeam}`;
+  const excelTeam: 'AEC' | 'MFG' | undefined =
+    userProfile?.role === 'Leader' ? userProfile.team : ocrTeam === 'all' ? undefined : ocrTeam;
 
   return (
     <FadeIn className="space-y-6">
-      <PageHeader title="Laporan" description="Analisis kinerja tim dan kesehatan bisnis">
-        <AnalyticsExportButton data={data} />
+      <PageHeader title="Laporan" description="Aktivitas & performa leads hasil scan OCR">
+        <OcrReportExport ocrData={ocrData} periodeLabel={periodeLabel} timLabel={timLabel} excelTeam={excelTeam} />
       </PageHeader>
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-        className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
-      >
-        <MetricCard
-          title="Total Pelanggan"
-          value={stats.totalCustomers.toLocaleString('id-ID')}
-          icon={<Users className="h-4 w-4" />}
-          change={calculateChange(stats.totalCustomers, stats.totalCustomersLastMonth)}
-          changeLabel="dari bulan lalu"
-        />
-        <MetricCard
-          title="Pelanggan Baru (Hari Ini)"
-          value={stats.newCustomersToday.toLocaleString('id-ID')}
-          icon={<UserPlus className="h-4 w-4" />}
-          change={calculateChange(stats.newCustomersToday, stats.newCustomersYesterday)}
-          changeLabel="dari kemarin"
-        />
-        <MetricCard
-          title="Total Revenue"
-          value={formatCurrency(stats.totalRevenue)}
-          icon={<DollarSign className="h-4 w-4" />}
-          change={calculateChange(stats.totalRevenue, stats.totalRevenueLastMonth)}
-          changeLabel="dari bulan lalu"
-        />
-        <MetricCard
-          title="Deal Dimenangkan (Hari Ini)"
-          value={stats.wonDealsToday.toLocaleString('id-ID')}
-          icon={<TrendingUp className="h-4 w-4" />}
-        />
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-        className="grid grid-cols-1 gap-6 lg:grid-cols-3"
-      >
-        <div className="lg:col-span-2 rounded-lg border bg-card p-4 lg:p-6">
-          <RevenueTrendChart data={data.revenueTrend} />
+      {/* Filter bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center rounded-lg border bg-card p-0.5 w-fit">
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setOcrRange(opt.value)}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                ocrRange === opt.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
+        <div className="flex items-center gap-2">
+          {ocrLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          {isSuperadmin && (
+            <Select value={ocrTeam} onValueChange={(v) => setOcrTeam(v as OcrTeamFilter)}>
+              <SelectTrigger className="h-8 w-[120px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Tim</SelectItem>
+                <SelectItem value="AEC">Tim AEC</SelectItem>
+                <SelectItem value="MFG">Tim MFG</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </div>
 
+      {/* OCR KPI */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <MetricCard
+          title="Total Leads OCR"
+          value={ocrData.stats.totalOcr.toLocaleString('id-ID')}
+          icon={<ScanLine className="h-4 w-4" />}
+        />
+        <MetricCard
+          title="Baru Hari Ini"
+          value={ocrData.stats.newToday.toLocaleString('id-ID')}
+          icon={<Zap className="h-4 w-4" />}
+        />
+        <MetricCard
+          title="Belum Di-assign"
+          value={ocrData.stats.unassigned.toLocaleString('id-ID')}
+          icon={<UserX className="h-4 w-4" />}
+        />
+        <MetricCard
+          title="Won (Konversi)"
+          value={`${ocrData.stats.won} (${ocrData.stats.conversionRate.toFixed(0)}%)`}
+          icon={<Trophy className="h-4 w-4" />}
+        />
+      </div>
+
+      {/* Blocks */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="rounded-lg border bg-card p-4 lg:p-6">
-          <h3 className="text-sm font-semibold">Distribusi Pelanggan</h3>
-          <p className="mt-1 text-xs text-muted-foreground">Jumlah pelanggan per anggota tim sales.</p>
-          <div className="mt-4 space-y-3">
-            {salesDistribution.length > 0 ? salesDistribution.map((sales, i) => {
-              const percentage = totalCustomersForDistribution > 0 ? (sales.customerCount / totalCustomersForDistribution) * 100 : 0;
-              return (
-                <motion.div
-                  key={sales.salesId || 'unassigned'}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + i * 0.05 }}
-                  className="space-y-1.5"
-                >
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-5 w-5">
-                        <AvatarFallback className="text-[10px]">{getInitials(sales.salesName)}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium">{sales.salesName}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{sales.customerCount}</span>
-                  </div>
-                  <Progress value={percentage} className="h-1.5" />
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <div className="flex flex-wrap gap-1">
-                      {Object.entries(sales.pipelineBreakdown).map(([status, count]) => (
-                        <span key={status} className="rounded bg-muted px-1.5 py-0.5">{status}: {count}</span>
-                      ))}
-                    </div>
-                    <span className="font-medium text-foreground/80">{formatCurrency(sales.totalRevenue)}</span>
-                  </div>
-                </motion.div>
-              );
-            }) : (
-              <p className="py-4 text-center text-sm text-muted-foreground">Tidak ada data.</p>
-            )}
-          </div>
+          <h3 className="text-sm font-semibold">Distribusi per Sales</h3>
+          <p className="mt-1 mb-4 text-xs text-muted-foreground">Ranking leads OCR per sales rep (periode terpilih).</p>
+          <OcrSalesRanking rows={ocrData.perSales} />
         </div>
-      </motion.div>
+        <div className="rounded-lg border bg-card p-4 lg:p-6">
+          <h3 className="text-sm font-semibold">Funnel Konversi</h3>
+          <p className="mt-1 mb-4 text-xs text-muted-foreground">Sebaran leads OCR per stage pipeline.</p>
+          <OcrFunnel
+            funnel={ocrData.funnel}
+            totalOcr={ocrData.stats.totalOcr}
+            conversionRate={ocrData.stats.conversionRate}
+          />
+        </div>
+        <div className="rounded-lg border bg-card p-4 lg:p-6">
+          <h3 className="text-sm font-semibold">Kualitas Data OCR</h3>
+          <p className="mt-1 mb-4 text-xs text-muted-foreground">Data kosong/invalid dari hasil scan.</p>
+          <OcrDataQuality quality={ocrData.quality} />
+        </div>
+      </div>
     </FadeIn>
   );
 }

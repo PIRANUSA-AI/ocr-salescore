@@ -7,7 +7,7 @@
 import { getCustomers } from './customer';
 import { getSalesUsers } from './user';
 import { PIPELINE_STAGES } from '@/types';
-import type { Customer, UserProfile, PipelineStatus } from '@/types';
+import type { UserProfile } from '@/types';
 import { toZonedTime } from 'date-fns-tz';
 import {
   startOfDay,
@@ -26,16 +26,6 @@ export interface SalesDistribution {
   totalRevenue: number;
 }
 
-export interface FunnelStage {
-  status: PipelineStatus;
-  count: number;
-}
-
-export interface LeadTrendPoint {
-  name: string;
-  count: number;
-}
-
 export interface ReportData {
   stats: {
     newCustomersToday: number;
@@ -44,13 +34,9 @@ export interface ReportData {
     totalCustomersLastMonth: number;
     totalRevenue: number;
     totalRevenueLastMonth: number;
-    activeLeads: number;
-    winRate: number;
     conversionRate: number;
     wonDealsToday: number;
   };
-  leadTrend: LeadTrendPoint[];
-  funnelBreakdown: FunnelStage[];
   revenueTrend: { name: string; revenue: number }[];
   salesDistribution: SalesDistribution[];
 }
@@ -144,17 +130,6 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
     const wonDeals = relevantCustomers.filter(
       (c) => c.pipelineStatus === 'Won'
     );
-    const lostDeals = relevantCustomers.filter(
-      (c) => c.pipelineStatus === 'Lost'
-    );
-    const closedDeals = wonDeals.length + lostDeals.length;
-
-    const activeLeads = relevantCustomers.filter(
-      (c) => c.pipelineStatus !== 'Won' && c.pipelineStatus !== 'Lost'
-    ).length;
-
-    const winRate =
-      closedDeals > 0 ? (wonDeals.length / closedDeals) * 100 : 0;
 
     const totalRevenue = wonDeals.reduce(
       (acc, c) => acc + (c.potentialRevenue || 0),
@@ -181,27 +156,7 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
     const conversionRate =
       totalDeals > 0 ? (wonDeals.length / totalDeals) * 100 : 0;
 
-    // 3. Lead Trend (6 bulan terakhir + bulan ini)
-    const leadTrend: LeadTrendPoint[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = subMonths(nowJakarta, i);
-      const monthStart = startOfMonth(date);
-      const monthEnd = endOfMonth(date);
-
-      const monthCount = relevantCustomers.filter((c) => {
-        const created = toDateSafe(c.createdAt);
-        if (!created) return false;
-        const createdJakarta = toZonedTime(created, timeZone);
-        return createdJakarta >= monthStart && createdJakarta <= monthEnd;
-      }).length;
-
-      leadTrend.push({
-        name: date.toLocaleString('default', { month: 'short' }),
-        count: monthCount,
-      });
-    }
-
-    // 3b. Revenue Trend (6 bulan terakhir + bulan ini)
+    // 3. Revenue Trend (6 bulan terakhir + bulan ini)
     const revenueTrend: { name: string; revenue: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const date = subMonths(nowJakarta, i);
@@ -223,13 +178,7 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
       });
     }
 
-    // 4. Funnel Breakdown (jumlah lead per pipeline stage, urut sesuai PIPELINE_STAGES)
-    const funnelBreakdown: FunnelStage[] = PIPELINE_STAGES.map((status) => ({
-      status,
-      count: relevantCustomers.filter((c) => c.pipelineStatus === status).length,
-    }));
-
-    // 5. Sales Distribution
+    // 4. Sales Distribution
     const distribution: Record<string, { name: string; count: number; pipelineBreakdown: Record<string, number>; revenue: number }> = {};
 
     relevantCustomers.forEach((customer) => {
@@ -267,13 +216,9 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
         totalCustomersLastMonth,
         totalRevenue,
         totalRevenueLastMonth,
-        activeLeads,
-        winRate,
         conversionRate,
         wonDealsToday,
       },
-      leadTrend,
-      funnelBreakdown,
       revenueTrend,
       salesDistribution,
     };
@@ -284,6 +229,195 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
     return report;
   } catch (error) {
     console.error('[Action: getReportData] !!! ERROR !!!', error);
+    throw error;
+  }
+}
+
+// ============ OCR REPORT ============
+
+export type OcrTimeRange = 'today' | '7d' | '30d' | 'all';
+export type OcrTeamFilter = 'AEC' | 'MFG' | 'all';
+
+export interface OcrSalesRow {
+  salesId: string | null;
+  salesName: string;
+  total: number;
+  newToday: number;
+  won: number;
+  conversionRate: number;
+  potentialRevenue: number;
+}
+
+export interface OcrFunnelStage {
+  status: string;
+  count: number;
+}
+
+export interface OcrQualityReport {
+  total: number;
+  noEmail: number;
+  noPhone: number;
+  invalidEmail: number;
+}
+
+export interface OcrReportData {
+  stats: {
+    totalOcr: number;
+    newToday: number;
+    unassigned: number;
+    won: number;
+    conversionRate: number;
+  };
+  perSales: OcrSalesRow[];
+  funnel: OcrFunnelStage[];
+  quality: OcrQualityReport;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function getOcrReportData(
+  user: UserProfile,
+  range: OcrTimeRange = '30d',
+  team: OcrTeamFilter = 'all'
+): Promise<OcrReportData> {
+  console.log(
+    `[Action: getOcrReportData] range=${range}, team=${team}, user=${user.name} (${user.role})`
+  );
+  try {
+    const allCustomers = await getCustomers();
+
+    // 1. Filter OCR only
+    let ocrCustomers = allCustomers.filter(
+      (c) => c.acquisitionContext?.source === 'OCR'
+    );
+
+    // 2. Team scoping
+    if (user.role === 'Leader') {
+      // Leader hanya lihat OCR leads tim-nya sendiri
+      const salesTeam = await getSalesUsers();
+      const teamSalesIds = salesTeam
+        .filter((s) => s.team === user.team)
+        .map((s) => s.uid);
+      ocrCustomers = ocrCustomers.filter(
+        (c) =>
+          c.team === user.team ||
+          (c.assignedSalesId ? teamSalesIds.includes(c.assignedSalesId) : false)
+      );
+    } else if (user.role === 'Sales') {
+      // Safety: Sales hanya lihat miliknya (view Laporan memang untuk Leader/Superadmin)
+      ocrCustomers = ocrCustomers.filter((c) => c.assignedSalesId === user.uid);
+    } else {
+      // Superadmin: apply team filter
+      if (team !== 'all') {
+        ocrCustomers = ocrCustomers.filter((c) => c.team === team);
+      }
+    }
+
+    // 3. Time range (createdAt, Jakarta tz)
+    const now = new Date();
+    const nowJakarta = toZonedTime(now, timeZone);
+    const startToday = startOfDay(nowJakarta);
+    const endToday = endOfDay(nowJakarta);
+
+    let rangeStart: Date | null = null;
+    if (range === 'today') rangeStart = startToday;
+    else if (range === '7d') rangeStart = startOfDay(subDays(nowJakarta, 7));
+    else if (range === '30d') rangeStart = startOfDay(subDays(nowJakarta, 30));
+
+    if (rangeStart) {
+      const rangeEnd = range === 'today' ? endToday : nowJakarta;
+      ocrCustomers = ocrCustomers.filter((c) => {
+        const created = toDateSafe(c.createdAt);
+        if (!created) return false;
+        const createdJakarta = toZonedTime(created, timeZone);
+        return createdJakarta >= rangeStart! && createdJakarta <= rangeEnd;
+      });
+    }
+
+    // 4. Stats
+    const totalOcr = ocrCustomers.length;
+    const newToday = ocrCustomers.filter((c) => {
+      const created = toDateSafe(c.createdAt);
+      if (!created) return false;
+      const createdJakarta = toZonedTime(created, timeZone);
+      return createdJakarta >= startToday && createdJakarta <= endToday;
+    }).length;
+    const unassigned = ocrCustomers.filter((c) => !c.assignedSalesId).length;
+    const won = ocrCustomers.filter((c) => c.pipelineStatus === 'Won').length;
+    const conversionRate = totalOcr > 0 ? (won / totalOcr) * 100 : 0;
+
+    // 5. Per-sales aggregation
+    const dist: Record<
+      string,
+      { salesName: string; total: number; newToday: number; won: number; potentialRevenue: number }
+    > = {};
+
+    ocrCustomers.forEach((c) => {
+      const id = c.assignedSalesId || 'unassigned';
+      const name = c.assignedSalesName || 'Belum Ditugaskan';
+      if (!dist[id]) {
+        dist[id] = { salesName: name, total: 0, newToday: 0, won: 0, potentialRevenue: 0 };
+      }
+      dist[id].total++;
+      const created = toDateSafe(c.createdAt);
+      if (created) {
+        const cj = toZonedTime(created, timeZone);
+        if (cj >= startToday && cj <= endToday) dist[id].newToday++;
+      }
+      if (c.pipelineStatus === 'Won') {
+        dist[id].won++;
+        dist[id].potentialRevenue += c.potentialRevenue || 0;
+      }
+    });
+
+    const perSales: OcrSalesRow[] = Object.entries(dist)
+      .map(([id, d]) => ({
+        salesId: id === 'unassigned' ? null : id,
+        salesName: d.salesName,
+        total: d.total,
+        newToday: d.newToday,
+        won: d.won,
+        conversionRate: d.total > 0 ? (d.won / d.total) * 100 : 0,
+        potentialRevenue: d.potentialRevenue,
+      }))
+      .sort((a, b) => {
+        // Unassigned selalu di paling bawah
+        if (a.salesId === null) return 1;
+        if (b.salesId === null) return -1;
+        return b.total - a.total;
+      });
+
+    // 6. Funnel (per pipeline stage)
+    const funnel: OcrFunnelStage[] = PIPELINE_STAGES.map((status) => ({
+      status,
+      count: ocrCustomers.filter((c) => c.pipelineStatus === status).length,
+    }));
+
+    // 7. Data quality
+    const noEmail = ocrCustomers.filter(
+      (c) => !c.email || c.email.trim() === ''
+    ).length;
+    const noPhone = ocrCustomers.filter(
+      (c) => !c.phone || c.phone.trim() === ''
+    ).length;
+    const invalidEmail = ocrCustomers.filter((c) => {
+      if (!c.email || c.email.trim() === '') return false;
+      return !EMAIL_REGEX.test(c.email);
+    }).length;
+
+    const report: OcrReportData = {
+      stats: { totalOcr, newToday, unassigned, won, conversionRate },
+      perSales,
+      funnel,
+      quality: { total: totalOcr, noEmail, noPhone, invalidEmail },
+    };
+
+    console.log('[Action: getOcrReportData] >>> SUKSES!', {
+      totalOcr, perSales: perSales.length,
+    });
+    return report;
+  } catch (error) {
+    console.error('[Action: getOcrReportData] !!! ERROR !!!', error);
     throw error;
   }
 }

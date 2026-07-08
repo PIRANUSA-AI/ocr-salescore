@@ -14,6 +14,7 @@ import { MobileHeader } from '@/components/dashboard/mobile-header';
 import CustomerManagementView from './leader/views/customer-management-view';
 import ReportPage from './report/page';
 import OcrCaptureViewWrapper from './leader/views/ocr-capture-view';
+import DealsView from './leader/views/deals-view';
 import { MyCustomersView } from './sales/my-customers-view';
 import { UserManager } from './superadmin/user-manager';
 import { GlobalCustomerManager } from './superadmin/global-customer-manager';
@@ -21,7 +22,7 @@ import { GlobalCustomerManager } from './superadmin/global-customer-manager';
 const OCR_FOCUS = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'true') === 'true';
 const LOADER = <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
-const VALID_VIEWS = new Set(['ocr-capture', 'customer-manager', 'my-customers', 'report', 'user-manager', 'global-customers']);
+const VALID_VIEWS = new Set(['ocr-capture', 'customer-manager', 'my-customers', 'report', 'user-manager', 'global-customers', 'deals']);
 
 function DashboardUI() {
   const { userProfile, loading } = useAuth();
@@ -56,6 +57,7 @@ function DashboardUI() {
       'ocr-capture': <OcrCaptureViewWrapper />,
       'customer-manager': <CustomerManagementView />,
       'my-customers': <MyCustomersView />,
+      'deals': <DealsView />,
       'report': <ReportPage />,
       'user-manager': <UserManager />,
       'global-customers': <GlobalCustomerManager />,

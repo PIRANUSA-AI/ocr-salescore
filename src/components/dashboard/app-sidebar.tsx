@@ -14,7 +14,7 @@ import {
     SidebarSeparator,
     useSidebar,
 } from "@/components/ui/sidebar";
-import { ScanLine, Users, BarChart3, Settings, ShieldCheck } from 'lucide-react';
+import { ScanLine, Users, BarChart3, Settings, ShieldCheck, Kanban } from 'lucide-react';
 
 interface AppSidebarProps {
     activeView: string;
@@ -34,6 +34,9 @@ export function AppSidebar({ activeView, onViewChange }: AppSidebarProps) {
             { id: 'ocr-capture', label: 'Scan', icon: ScanLine },
             { id: isSuperadmin ? 'global-customers' : 'customer-manager', label: 'Customers', icon: Users },
         ];
+        if (userProfile.role === 'Leader' || userProfile.role === 'Sales') {
+            base.push({ id: 'deals', label: 'Pipeline', icon: Kanban });
+        }
         if (userProfile.role === 'Leader' || isSuperadmin) {
             base.push({ id: 'report', label: 'Laporan', icon: BarChart3 });
         }
@@ -66,11 +69,8 @@ export function AppSidebar({ activeView, onViewChange }: AppSidebarProps) {
                                 isActive={activeView === item.id}
                                 tooltip={item.label}
                                 size="lg"
-                                className="relative rounded-lg data-[active=true]:text-primary data-[active=true]:font-semibold transition-colors hover:bg-sidebar-accent"
+                                className="relative rounded-lg data-[active=true]:text-primary data-[active=true]:font-semibold transition-colors hover:bg-sidebar-accent data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1/2 data-[active=true]:before:-translate-y-1/2 data-[active=true]:before:h-5 data-[active=true]:before:w-0.5 data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary data-[active=true]:before:content-['']"
                             >
-                                {activeView === item.id && (
-                                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-full" />
-                                )}
                                 <item.icon className={isCollapsed ? "h-5 w-5" : "h-4 w-4"} />
                                 <span className="text-sm">{item.label}</span>
                             </SidebarMenuButton>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { ScanLine, Users, Settings, ShieldCheck, BarChart3 } from 'lucide-react';
+import { ScanLine, Users, Settings, ShieldCheck, BarChart3, Kanban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -19,6 +19,9 @@ export function BottomNavbar({ activeView, onViewChange }: BottomNavbarProps) {
     { id: 'ocr-capture', label: 'Scan', icon: ScanLine },
     { id: isSuperadmin ? 'global-customers' : 'customer-manager', label: 'Customers', icon: Users },
   ];
+  if (userProfile?.role === 'Leader' || userProfile?.role === 'Sales') {
+    navItems.push({ id: 'deals', label: 'Pipeline', icon: Kanban });
+  }
   if (userProfile?.role === 'Leader' || userProfile?.role === 'Superadmin') {
     navItems.push({ id: 'report', label: 'Laporan', icon: BarChart3 });
   }

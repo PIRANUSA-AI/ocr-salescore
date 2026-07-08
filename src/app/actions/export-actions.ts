@@ -4,6 +4,19 @@ import { adminDb } from '@/lib/firebase-admin';
 import type { Customer, PipelineStatus } from '@/types';
 import { getSalesUsers } from './user';
 
+// Konversi Firestore Timestamp / Date / string ke string biasa agar aman
+// dilewatkan dari Server Action ke Client Component.
+const fmtDate = (v: any): string => {
+    try {
+        if (!v) return '';
+        const d = typeof v.toDate === 'function' ? v.toDate() : v instanceof Date ? v : new Date(v);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleString('id-ID');
+    } catch {
+        return '';
+    }
+};
+
 /**
  * Export customers to Excel format (returns JSON for client-side processing)
  */
@@ -47,9 +60,9 @@ export async function exportCustomersToExcel(filters?: {
             'Kode Sales': (c.assignedSalesId && salesCodeByUid.get(c.assignedSalesId)) || '',
             'Potensi Revenue': c.potentialRevenue || 0,
             'Produk': c.products?.map(p => p.name).join(', ') || '',
-            'Sumber': c.acquisitionContext.source,
-            'Dibuat': c.createdAt,
-            'Diupdate': c.updatedAt,
+            'Sumber': c.acquisitionContext?.source || '',
+            'Dibuat': fmtDate(c.createdAt),
+            'Diupdate': fmtDate(c.updatedAt),
         }));
 
         console.log(`[Action: exportCustomersToExcel] Exported ${exportData.length} records`);
