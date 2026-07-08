@@ -66,6 +66,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
   const [salesNotes, setSalesNotes] = useState('');
   const [eventName, setEventName] = useState('');
 
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -95,7 +96,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     setSalesNotes('');
     setEventName('');
     stopCamera();
-    if (fileInputRef.current) { fileInputRef.current.value = ''; }
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }, [stopCamera]);
 
   const handleClose = () => {
@@ -385,10 +387,11 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
               <Button type="button" onClick={() => fileInputRef.current?.click()}>
                 <UploadCloud className="mr-2 h-4 w-4" /> Pilih Gambar
               </Button>
-              <Button type="button" variant="outline" onClick={() => setStatus('camera')}>
+              <Button type="button" variant="outline" onClick={() => cameraInputRef.current?.click()}>
                 <Camera className="mr-2 h-4 w-4" /> Gunakan Kamera
               </Button>
             </div>
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg, image/webp" className="hidden" />
           </div>
         );

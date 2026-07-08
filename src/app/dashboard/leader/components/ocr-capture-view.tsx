@@ -408,7 +408,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <Button size="lg" className="h-20 text-base active:translate-y-px" onClick={() => setStatus('camera')}>
+            <Button size="lg" className="h-20 text-base active:translate-y-px" onClick={() => cameraInputRef.current?.click()}>
               <Camera className="h-6 w-6 mr-3" /> Foto Kartu Nama
             </Button>
             <Button size="lg" variant="outline" className="h-14 active:translate-y-px" onClick={() => fileInputRef.current?.click()}>
