@@ -54,7 +54,7 @@ export const CustomerManager = () => {
     const { toast } = useToast();
     const router = useRouter();
     const isMobile = useMediaQuery("(max-width: 768px)");
-    const { customers, isLoading, refreshAllData, handleAssignSalesToEntity, openCustomerEditDialog, userProfile, handleBulkDelete } = useDashboard();
+    const { customers, isLoading, refreshAllData, handleAssignSalesToEntity, openCustomerEditDialog, userProfile, handleBulkDelete, salesTeam } = useDashboard();
 
     const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -110,9 +110,11 @@ export const CustomerManager = () => {
             toast({ variant: "destructive", title: "Tidak ada data untuk diunduh", description: "Silakan tambahkan pelanggan terlebih dahulu." });
             return;
         }
+        const salesCodeByUid = new Map(salesTeam.map(s => [s.uid, s.salesCode || '']));
         const dataToExport = filteredCustomers.map(c => ({
             'Nama': c.name, 'Perusahaan': c.company, 'Email': c.email, 'Telepon': c.phone,
             'Status': c.pipelineStatus, 'Sales': c.assignedSalesName || '-',
+            'Kode Sales': (c.assignedSalesId && salesCodeByUid.get(c.assignedSalesId)) || '',
             'Tanggal': new Date(c.createdAt).toLocaleDateString('id-ID'),
         }));
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);

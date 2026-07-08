@@ -6,7 +6,8 @@
 
 import { getCustomers } from './customer';
 import { getSalesUsers } from './user';
-import type { Customer, UserProfile } from '@/types';
+import { PIPELINE_STAGES } from '@/types';
+import type { Customer, UserProfile, PipelineStatus } from '@/types';
 import { toZonedTime } from 'date-fns-tz';
 import {
   startOfDay,
@@ -21,6 +22,18 @@ export interface SalesDistribution {
   salesId: string | null;
   salesName: string;
   customerCount: number;
+  pipelineBreakdown: Record<string, number>;
+  totalRevenue: number;
+}
+
+export interface FunnelStage {
+  status: PipelineStatus;
+  count: number;
+}
+
+export interface LeadTrendPoint {
+  name: string;
+  count: number;
 }
 
 export interface ReportData {
@@ -31,13 +44,14 @@ export interface ReportData {
     totalCustomersLastMonth: number;
     totalRevenue: number;
     totalRevenueLastMonth: number;
+    activeLeads: number;
+    winRate: number;
     conversionRate: number;
     wonDealsToday: number;
   };
-  revenueTrend: {
-    name: string;
-    revenue: number;
-  }[];
+  leadTrend: LeadTrendPoint[];
+  funnelBreakdown: FunnelStage[];
+  revenueTrend: { name: string; revenue: number }[];
   salesDistribution: SalesDistribution[];
 }
 
@@ -130,6 +144,17 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
     const wonDeals = relevantCustomers.filter(
       (c) => c.pipelineStatus === 'Won'
     );
+    const lostDeals = relevantCustomers.filter(
+      (c) => c.pipelineStatus === 'Lost'
+    );
+    const closedDeals = wonDeals.length + lostDeals.length;
+
+    const activeLeads = relevantCustomers.filter(
+      (c) => c.pipelineStatus !== 'Won' && c.pipelineStatus !== 'Lost'
+    ).length;
+
+    const winRate =
+      closedDeals > 0 ? (wonDeals.length / closedDeals) * 100 : 0;
 
     const totalRevenue = wonDeals.reduce(
       (acc, c) => acc + (c.potentialRevenue || 0),
@@ -156,7 +181,27 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
     const conversionRate =
       totalDeals > 0 ? (wonDeals.length / totalDeals) * 100 : 0;
 
-    // 3. Revenue Trend (6 bulan terakhir + bulan ini)
+    // 3. Lead Trend (6 bulan terakhir + bulan ini)
+    const leadTrend: LeadTrendPoint[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = subMonths(nowJakarta, i);
+      const monthStart = startOfMonth(date);
+      const monthEnd = endOfMonth(date);
+
+      const monthCount = relevantCustomers.filter((c) => {
+        const created = toDateSafe(c.createdAt);
+        if (!created) return false;
+        const createdJakarta = toZonedTime(created, timeZone);
+        return createdJakarta >= monthStart && createdJakarta <= monthEnd;
+      }).length;
+
+      leadTrend.push({
+        name: date.toLocaleString('default', { month: 'short' }),
+        count: monthCount,
+      });
+    }
+
+    // 3b. Revenue Trend (6 bulan terakhir + bulan ini)
     const revenueTrend: { name: string; revenue: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const date = subMonths(nowJakarta, i);
@@ -178,17 +223,28 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
       });
     }
 
-    // 4. Sales Distribution
-    const distribution: Record<string, { name: string; count: number }> = {};
+    // 4. Funnel Breakdown (jumlah lead per pipeline stage, urut sesuai PIPELINE_STAGES)
+    const funnelBreakdown: FunnelStage[] = PIPELINE_STAGES.map((status) => ({
+      status,
+      count: relevantCustomers.filter((c) => c.pipelineStatus === status).length,
+    }));
+
+    // 5. Sales Distribution
+    const distribution: Record<string, { name: string; count: number; pipelineBreakdown: Record<string, number>; revenue: number }> = {};
 
     relevantCustomers.forEach((customer) => {
       const salesId = customer.assignedSalesId || 'unassigned';
       const salesName = customer.assignedSalesName || 'Belum Ditugaskan';
 
       if (!distribution[salesId]) {
-        distribution[salesId] = { name: salesName, count: 0 };
+        distribution[salesId] = { name: salesName, count: 0, pipelineBreakdown: {}, revenue: 0 };
       }
       distribution[salesId].count++;
+      distribution[salesId].pipelineBreakdown[customer.pipelineStatus] =
+        (distribution[salesId].pipelineBreakdown[customer.pipelineStatus] || 0) + 1;
+      if (customer.pipelineStatus === 'Won') {
+        distribution[salesId].revenue += customer.potentialRevenue || 0;
+      }
     });
 
     const salesDistribution: SalesDistribution[] = Object.entries(
@@ -198,6 +254,8 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
         salesId: salesId === 'unassigned' ? null : salesId,
         salesName: data.name,
         customerCount: data.count,
+        pipelineBreakdown: data.pipelineBreakdown,
+        totalRevenue: data.revenue,
       }))
       .sort((a, b) => b.customerCount - a.customerCount);
 
@@ -209,9 +267,13 @@ export async function getReportData(user: UserProfile): Promise<ReportData> {
         totalCustomersLastMonth,
         totalRevenue,
         totalRevenueLastMonth,
+        activeLeads,
+        winRate,
         conversionRate,
         wonDealsToday,
       },
+      leadTrend,
+      funnelBreakdown,
       revenueTrend,
       salesDistribution,
     };

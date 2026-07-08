@@ -143,6 +143,14 @@ export default function ReportPage() {
                     <span className="text-xs text-muted-foreground">{sales.customerCount}</span>
                   </div>
                   <Progress value={percentage} className="h-1.5" />
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(sales.pipelineBreakdown).map(([status, count]) => (
+                        <span key={status} className="rounded bg-muted px-1.5 py-0.5">{status}: {count}</span>
+                      ))}
+                    </div>
+                    <span className="font-medium text-foreground/80">{formatCurrency(sales.totalRevenue)}</span>
+                  </div>
                 </motion.div>
               );
             }) : (

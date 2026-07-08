@@ -85,14 +85,17 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       const formattedSales = salesData.map(s => ({ ...s, id: s.uid }));
       setSalesTeam(formattedSales);
 
-      const customersPromise = userProfile.role === 'Leader'
-        ? getAllCustomers().then(allCustomers => allCustomers.filter(c => {
-          const isTeamMatch = c.team === userProfile.team;
-          const teamSalesIds = formattedSales.map(s => s.id);
-          const isAssignedToTeam = c.assignedSalesId && teamSalesIds.includes(c.assignedSalesId);
-          return isTeamMatch || isAssignedToTeam;
-        }))
-        : getAssignedCustomers(user.uid);
+      const customersPromise =
+          userProfile.role === 'Superadmin'
+            ? getAllCustomers()
+            : userProfile.role === 'Leader'
+            ? getAllCustomers().then(allCustomers => allCustomers.filter(c => {
+              const isTeamMatch = c.team === userProfile.team;
+              const teamSalesIds = formattedSales.map(s => s.id);
+              const isAssignedToTeam = c.assignedSalesId && teamSalesIds.includes(c.assignedSalesId);
+              return isTeamMatch || isAssignedToTeam;
+            }))
+            : getAssignedCustomers(user.uid);
 
       const [customersData] = await Promise.all([customersPromise]);
       setCustomers(customersData);

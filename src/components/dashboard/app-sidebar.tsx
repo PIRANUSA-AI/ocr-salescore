@@ -14,7 +14,7 @@ import {
     SidebarSeparator,
     useSidebar,
 } from "@/components/ui/sidebar";
-import { ScanLine, Users, BarChart3, Settings } from 'lucide-react';
+import { ScanLine, Users, BarChart3, Settings, ShieldCheck } from 'lucide-react';
 
 interface AppSidebarProps {
     activeView: string;
@@ -29,12 +29,16 @@ export function AppSidebar({ activeView, onViewChange }: AppSidebarProps) {
 
     const menuItems = useMemo(() => {
         if (!userProfile) return [];
+        const isSuperadmin = userProfile.role === 'Superadmin';
         const base = [
             { id: 'ocr-capture', label: 'Scan', icon: ScanLine },
-            { id: 'customer-manager', label: 'Customers', icon: Users },
+            { id: isSuperadmin ? 'global-customers' : 'customer-manager', label: 'Customers', icon: Users },
         ];
-        if (userProfile.role === 'Leader') {
+        if (userProfile.role === 'Leader' || isSuperadmin) {
             base.push({ id: 'report', label: 'Laporan', icon: BarChart3 });
+        }
+        if (isSuperadmin) {
+            base.push({ id: 'user-manager', label: 'Kelola User', icon: ShieldCheck });
         }
         return base;
     }, [userProfile]);

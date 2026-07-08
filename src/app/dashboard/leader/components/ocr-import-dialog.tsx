@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,18 +18,6 @@ import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-const SALES_PEOPLE = [
-  { code: 'LN', name: 'Lukman' },
-  { code: 'LS', name: 'Lody' },
-  { code: 'NU', name: 'Nurhayati' },
-  { code: 'RU', name: 'Rustini' },
-  { code: 'TK', name: 'Tika' },
-  { code: 'TA', name: 'Ita' },
-  { code: 'BR', name: 'Brist' },
-  { code: 'RQ', name: 'Rizqi' },
-];
-const SALES_CODE_SET = new Set(SALES_PEOPLE.map(p => p.code));
 
 function matchOptions(answer: string, options: readonly string[]): { matched: string[]; other: string } {
   if (!answer) return { matched: [], other: '' };
@@ -71,8 +59,14 @@ interface OcrImportDialogProps {
 }
 
 export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capturedImage = null, startInCameraMode = false }: OcrImportDialogProps) {
-  const { userProfile } = useDashboard();
+  const { userProfile, salesTeam } = useDashboard();
   const { toast } = useToast();
+
+  const salesPeople = useMemo(
+    () => salesTeam.filter(s => !!s.salesCode).map(s => ({ code: s.salesCode as string, name: s.name, uid: s.uid })),
+    [salesTeam]
+  );
+  const salesCodeSet = useMemo(() => new Set(salesPeople.map(p => p.code)), [salesPeople]);
 
   const [status, setStatus] = useState<Status>('idle');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -290,7 +284,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         const words = allText.split(/[\s,;:/()]+/).filter(Boolean);
         for (const word of words) {
           const clean = word.replace(/[^A-Za-z]/g, '').toUpperCase();
-          if (SALES_CODE_SET.has(clean) && word.length <= 3) {
+          if (salesCodeSet.has(clean) && word.length <= 3) {
             setSalesCode(clean);
             break;
           }
@@ -404,6 +398,8 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
       { question: 'Skor', answer: skor },
     ].filter(qa => qa.answer);
 
+    const matchedSales = salesPeople.find(p => p.code === salesCode);
+
     setStatus('saving');
     try {
       await createManualCustomer({
@@ -415,8 +411,8 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         address: fields.address?.trim() || '',
         creatorTeam,
         products: [],
-        assignedSalesId: null,
-        assignedSalesName: null,
+        assignedSalesId: matchedSales?.uid ?? null,
+        assignedSalesName: matchedSales?.name ?? null,
         notes: `Sales: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: result?.imageUrl || '',
         imageKey: '',
@@ -564,7 +560,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="salesCode">Sales <span className="text-red-500">*</span></Label>
                 <div className="grid grid-cols-4 gap-2">
-                  {SALES_PEOPLE.map((p) => (
+                  {salesPeople.map((p) => (
                     <Button key={p.code} type="button" variant={salesCode === p.code ? 'default' : 'outline'} size="sm" className="active:translate-y-px text-xs" disabled={status === 'saving'} onClick={() => setSalesCode(p.code)}>
                       {p.code}
                     </Button>

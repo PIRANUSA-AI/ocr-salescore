@@ -1,22 +1,31 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { ScanLine, Users, Settings } from 'lucide-react';
+import { ScanLine, Users, Settings, ShieldCheck, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
 
 interface BottomNavbarProps {
   activeView: string;
   onViewChange: (view: string) => void;
 }
 
-const NAV_ITEMS = [
-  { id: 'ocr-capture', label: 'Scan', icon: ScanLine },
-  { id: 'customer-manager', label: 'Customers', icon: Users },
-  { id: 'profile', label: 'Akun', icon: Settings },
-];
-
 export function BottomNavbar({ activeView, onViewChange }: BottomNavbarProps) {
   const router = useRouter();
+  const { userProfile } = useAuth();
+
+  const isSuperadmin = userProfile?.role === 'Superadmin';
+  const navItems = [
+    { id: 'ocr-capture', label: 'Scan', icon: ScanLine },
+    { id: isSuperadmin ? 'global-customers' : 'customer-manager', label: 'Customers', icon: Users },
+  ];
+  if (userProfile?.role === 'Leader' || userProfile?.role === 'Superadmin') {
+    navItems.push({ id: 'report', label: 'Laporan', icon: BarChart3 });
+  }
+  if (userProfile?.role === 'Superadmin') {
+    navItems.push({ id: 'user-manager', label: 'User', icon: ShieldCheck });
+  }
+  navItems.push({ id: 'profile', label: 'Akun', icon: Settings });
 
   const handleClick = (id: string) => {
     if (id === 'profile') {
@@ -29,7 +38,7 @@ export function BottomNavbar({ activeView, onViewChange }: BottomNavbarProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto flex h-14 max-w-sm items-stretch">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const isActive =
             item.id === 'profile'
               ? activeView === 'profile'

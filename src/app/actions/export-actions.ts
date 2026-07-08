@@ -2,6 +2,7 @@
 
 import { adminDb } from '@/lib/firebase-admin';
 import type { Customer, PipelineStatus } from '@/types';
+import { getSalesUsers } from './user';
 
 /**
  * Export customers to Excel format (returns JSON for client-side processing)
@@ -30,6 +31,9 @@ export async function exportCustomersToExcel(filters?: {
             customers.push({ ...data, id: doc.id });
         });
 
+        const salesUsers = await getSalesUsers();
+        const salesCodeByUid = new Map(salesUsers.map(s => [s.uid, s.salesCode || '']));
+
         // Transform to export format
         const exportData = customers.map(c => ({
             'Nama': c.name,
@@ -40,6 +44,7 @@ export async function exportCustomersToExcel(filters?: {
             'Tim': c.team,
             'Pipeline Status': c.pipelineStatus,
             'Sales': c.assignedSalesName || 'Belum Ditugaskan',
+            'Kode Sales': (c.assignedSalesId && salesCodeByUid.get(c.assignedSalesId)) || '',
             'Potensi Revenue': c.potentialRevenue || 0,
             'Produk': c.products?.map(p => p.name).join(', ') || '',
             'Sumber': c.acquisitionContext.source,

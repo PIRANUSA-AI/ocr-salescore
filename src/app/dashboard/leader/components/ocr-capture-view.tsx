@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, XCircle, Clock, Image as ImageIcon, ChevronLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { compressImageToDataUri } from '@/lib/image-compress';
 import { createManualCustomer } from '@/app/actions/leader';
 import { createOcrJob, processOcrJob } from '@/app/actions/ocr';
@@ -22,18 +23,6 @@ import { collection, query, where, limit, onSnapshot, Timestamp } from 'firebase
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
 import type { Customer } from '@/types';
-
-const SALES_PEOPLE = [
-  { code: 'LN', name: 'Lukman' },
-  { code: 'LS', name: 'Lody' },
-  { code: 'NU', name: 'Nurhayati' },
-  { code: 'RU', name: 'Rustini' },
-  { code: 'TK', name: 'Tika' },
-  { code: 'TA', name: 'Ita' },
-  { code: 'BR', name: 'Brist' },
-  { code: 'RQ', name: 'Rizqi' },
-];
-const SALES_CODE_SET = new Set(SALES_PEOPLE.map(p => p.code));
 
 const INDUSTRI_OPTIONS = ['Arsitek', 'Interior Design', 'Kontraktor', 'Developer'] as const;
 const PRODUCT_INTEREST = ['ZWCAD', 'SketchUp', 'Archicad', 'Rendering'] as const;
@@ -84,8 +73,15 @@ interface Props {
 
 export function OcrCaptureView({ recentCustomers }: Props) {
   const { userProfile } = useAuth();
+  const { salesTeam } = useDashboard();
   const { toast } = useToast();
   const router = useRouter();
+
+  const salesPeople = useMemo(
+    () => salesTeam.filter(s => !!s.salesCode).map(s => ({ code: s.salesCode as string, name: s.name, uid: s.uid })),
+    [salesTeam]
+  );
+  const salesCodeSet = useMemo(() => new Set(salesPeople.map(p => p.code)), [salesPeople]);
 
   const [jobs, setJobs] = useState<OcrJobData[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -205,7 +201,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     if (!salesCode) {
       const allText = [fields.name.value, fields.company.value, fields.jobTitle.value, fields.phone.value, fields.email.value, fields.softwareNeeds.value, ...fa.map(f => f.question + ' ' + f.answer)].join(' ');
       const words = allText.split(/[\s,;:/()]+/).filter(Boolean);
-      for (const word of words) { const clean = word.replace(/[^A-Za-z]/g, '').toUpperCase(); if (SALES_CODE_SET.has(clean) && word.length <= 3) { setSalesCode(clean); break; } }
+      for (const word of words) { const clean = word.replace(/[^A-Za-z]/g, '').toUpperCase(); if (salesCodeSet.has(clean) && word.length <= 3) { setSalesCode(clean); break; } }
     }
   }, [activeJobId]);
 
@@ -280,6 +276,8 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       { question: 'Skor', answer: skor },
     ].filter(qa => qa.answer);
 
+    const matchedSales = salesPeople.find(p => p.code === salesCode);
+
     setStatus('saving');
     try {
       await createManualCustomer({
@@ -291,8 +289,8 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         address: activeJob.result.address.value?.trim() || '',
         creatorTeam,
         products: [],
-        assignedSalesId: null,
-        assignedSalesName: null,
+        assignedSalesId: matchedSales?.uid ?? null,
+        assignedSalesName: matchedSales?.name ?? null,
         notes: `Sales: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: jobFields.imageUrl || '',
         imageKey: '',
@@ -387,7 +385,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             <div>
               <Label>Sales <span className="text-red-500">*</span></Label>
               <div className="grid grid-cols-4 gap-2 mt-1">
-                {SALES_PEOPLE.map((p) => (
+                {salesPeople.map((p) => (
                   <Button key={p.code} type="button" variant={salesCode === p.code ? 'default' : 'outline'} size="sm" className="text-xs" onClick={() => setSalesCode(p.code)}>
                     {p.code}
                   </Button>

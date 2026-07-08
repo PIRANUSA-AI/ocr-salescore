@@ -139,6 +139,7 @@ export type UserProfile = {
     role: 'Leader' | 'Sales' | 'Superadmin';
     team: 'AEC' | 'MFG';
     photoURL?: string;
+    salesCode?: string | null;
 };
 
 export type Sales = {
