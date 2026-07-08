@@ -245,6 +245,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
   const onSave = async () => {
     if (!userProfile || !activeJob?.result) return;
+    const jobFields = activeJob.result;
     if (!editableName.trim()) {
       toast({ variant: 'destructive', title: 'Nama wajib diisi.' });
       return;
@@ -291,7 +292,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         assignedSalesId: null,
         assignedSalesName: null,
         notes: `Sales: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
-        imageUrl: fields.imageUrl || '',
+        imageUrl: jobFields.imageUrl || '',
         imageKey: '',
         acquisitionContext: {
           source: 'OCR',

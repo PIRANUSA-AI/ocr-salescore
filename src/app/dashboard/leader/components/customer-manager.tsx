@@ -24,6 +24,19 @@ import { updateCustomerPriority } from '@/app/actions/customer';
 import { FadeIn } from '@/components/ui/fade-in';
 import { Skeleton } from '@/components/ui/skeleton';
 
+const getSalesCode = (c: Customer): string | null => {
+  if (c.assignedSalesName) return c.assignedSalesName;
+  if (c.notes && typeof c.notes === 'object' && 'manual' in c.notes) {
+    const m = (c.notes as any).manual?.match(/Sales: (\w+)/);
+    if (m) return m[1];
+  }
+  if (c.formAnswers) {
+    const fa = c.formAnswers.find(f => f.question.toLowerCase().includes('sales code'));
+    if (fa?.answer) return fa.answer;
+  }
+  return null;
+};
+
 const getValidPhoneNumbers = (phone: string | undefined | null): { original: string, number: string; isValid: boolean }[] => {
     if (!phone) return [];
     const parts = phone.split(/[,/\n;&]+/);
@@ -306,6 +319,9 @@ export const CustomerManager = () => {
                                 </div>
                                 <div className="flex items-center gap-2 mt-1.5 ml-7">
                                     <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{c.pipelineStatus}</span>
+                                    {getSalesCode(c) && (
+                                        <span className="text-[11px] font-mono text-muted-foreground bg-primary/10 px-1.5 py-0.5 rounded">{getSalesCode(c)}</span>
+                                    )}
                                 </div>
                             </div>
                         ))
@@ -322,6 +338,7 @@ export const CustomerManager = () => {
                                 <TableHead className="w-10"><Checkbox onCheckedChange={handleSelectAll} checked={selectedCustomers.length === paginatedCustomers.length && paginatedCustomers.length > 0} /></TableHead>
                                 <TableHead className="text-xs">Nama</TableHead>
                                 <TableHead className="text-xs w-[130px]">Status</TableHead>
+                                <TableHead className="text-xs w-[60px]">Sales</TableHead>
                                 <TableHead className="text-xs">Kontak</TableHead>
                                 <TableHead className="text-xs w-[80px]">Aksi</TableHead>
                             </TableRow>
@@ -333,6 +350,7 @@ export const CustomerManager = () => {
                                         <TableCell><Skeleton className="h-4 w-4 rounded" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                                         <TableCell><Skeleton className="h-7 w-24" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-36" /></TableCell>
                                         <TableCell><Skeleton className="h-7 w-16" /></TableCell>
                                     </TableRow>
@@ -354,6 +372,11 @@ export const CustomerManager = () => {
                                                 <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                                                 <SelectContent>{PIPELINE_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                                             </Select>
+                                        </TableCell>
+                                        <TableCell>
+                                            {getSalesCode(c) && (
+                                                <Badge variant="secondary" className="text-[10px] font-mono px-1.5 py-0">{getSalesCode(c)}</Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col gap-1">
