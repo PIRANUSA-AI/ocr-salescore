@@ -4,8 +4,21 @@ import { adminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 
+export async function createOcrJob(userId: string) {
+  const jobRef = adminDb.collection('jobs').doc();
+  const jobId = jobRef.id;
+  await jobRef.set({
+    id: jobId,
+    userId,
+    status: 'pending',
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return jobId;
+}
+
 export async function processOcrJob(jobId: string, imageDataUri: string) {
-  const jobRef = adminDb.collection('ocr_jobs').doc(jobId);
+  const jobRef = adminDb.collection('jobs').doc(jobId);
 
   try {
     await jobRef.set({

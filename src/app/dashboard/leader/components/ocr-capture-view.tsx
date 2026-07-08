@@ -14,11 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { compressImageToDataUri } from '@/lib/image-compress';
 import { createManualCustomer } from '@/app/actions/leader';
-import { processOcrJob } from '@/app/actions/ocr';
+import { createOcrJob, processOcrJob } from '@/app/actions/ocr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, setDoc, Timestamp, type DocumentData } from 'firebase/firestore';
+import { collection, query, where, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
 import type { Customer } from '@/types';
@@ -92,6 +92,11 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<'idle' | 'saving'>('idle');
 
+  const [editableName, setEditableName] = useState('');
+  const [editableCompany, setEditableCompany] = useState('');
+  const [editableJobTitle, setEditableJobTitle] = useState('');
+  const [editablePhone, setEditablePhone] = useState('');
+  const [editableEmail, setEditableEmail] = useState('');
   const [industri, setIndustri] = useState<string[]>([]);
   const [otherIndustri, setOtherIndustri] = useState('');
   const [productInterest, setProductInterest] = useState<string[]>([]);
@@ -117,7 +122,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   useEffect(() => {
     if (!userProfile?.uid) return;
     const q = query(
-      collection(db, 'ocr_jobs'),
+      collection(db, 'jobs'),
       where('userId', '==', userProfile.uid),
       limit(20)
     );
@@ -148,6 +153,11 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     if (!activeJob || activeJob.status !== 'done' || !activeJob.result) return;
     const fields = activeJob.result;
     const fa = fields.formAnswers ?? [];
+    setEditableName(fields.name.value);
+    setEditableCompany(fields.company.value);
+    setEditableJobTitle(fields.jobTitle.value);
+    setEditablePhone(fields.phone.value);
+    setEditableEmail(fields.email.value);
 
     const byQuestion = (keywords: string[]) => {
       for (const k of keywords) { const m = fa.find(f => f.question.toLowerCase().includes(k)); if (m?.answer) return m.answer; }
@@ -216,16 +226,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const processImage = useCallback(async (dataUri: string) => {
     if (!userProfile?.uid) return;
     const compressed = await compressImageToDataUri(dataUri);
-    const jobRef = doc(collection(db, 'ocr_jobs'));
-    const jobId = jobRef.id;
-
-    await setDoc(jobRef, {
-      id: jobId,
-      userId: userProfile.uid,
-      status: 'pending',
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
+    const jobId = await createOcrJob(userProfile.uid);
 
     setPreviews(prev => ({ ...prev, [jobId]: dataUri }));
     setActiveJobId(jobId);
@@ -244,9 +245,8 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
   const onSave = async () => {
     if (!userProfile || !activeJob?.result) return;
-    const fields = activeJob.result;
-    if (!fields.name.value?.trim()) {
-      toast({ variant: 'destructive', title: 'Nama wajib diisi (dari kartu nama).' });
+    if (!editableName.trim()) {
+      toast({ variant: 'destructive', title: 'Nama wajib diisi.' });
       return;
     }
     if (!salesCode) {
@@ -280,12 +280,12 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     setStatus('saving');
     try {
       await createManualCustomer({
-        name: fields.name.value.trim(),
-        company: fields.company.value?.trim() || '',
-        jobTitle: fields.jobTitle.value?.trim() || '',
-        phone: fields.phone.value?.trim() || '',
-        email: fields.email.value?.trim() || '',
-        address: fields.address.value?.trim() || '',
+        name: editableName.trim(),
+        company: editableCompany.trim(),
+        jobTitle: editableJobTitle.trim(),
+        phone: editablePhone.trim(),
+        email: editableEmail.trim(),
+        address: activeJob.result.address.value?.trim() || '',
         creatorTeam,
         products: [],
         assignedSalesId: null,
@@ -301,7 +301,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         formAnswers,
       } as any);
 
-      toast({ title: 'Tersimpan', description: `Lead ${fields.name.value} berhasil ditambahkan.` });
+      toast({ title: 'Tersimpan', description: `Lead ${editableName} berhasil ditambahkan.` });
       setActiveJobId(null);
       window.location.reload();
     } catch (err) {
@@ -336,46 +336,6 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       return found;
     };
 
-    // Auto-map on first render
-    useEffect(() => {
-      if (!industri.length && !productInterest.length && !currentSoftware.length) {
-        const indQ = byQuestion(['industri']); const indA = byAnswer(INDUSTRI_OPTIONS);
-        const ind = matchOptions(indQ || indA.join(', '), INDUSTRI_OPTIONS);
-        setIndustri(ind.matched.length ? ind.matched : indA);
-        if (ind.other) setOtherIndustri(ind.other);
-
-        const piQ = byQuestion(['produk', 'minat']); const piA = byAnswer(PRODUCT_INTEREST);
-        const pi = matchOptions(piQ || piA.join(', ') || fields.softwareNeeds.value, PRODUCT_INTEREST);
-        setProductInterest(pi.matched.length ? pi.matched : piA);
-        if (pi.other) setOtherProduct(pi.other);
-
-        const swQ = byQuestion(['software', 'saat ini', 'digunakan']); const swA = byAnswer(SOFTWARE_OPTIONS);
-        const sw = matchOptions(swQ || swA.join(', ') || fields.softwareNeeds.value, SOFTWARE_OPTIONS);
-        setCurrentSoftware(sw.matched.length ? sw.matched : swA);
-        if (sw.other) setOtherSoftware(sw.other);
-
-        const tl = byQuestion(['rencana', 'pembelian', 'kapan']);
-        if (tl) TIMELINE_OPTIONS.forEach(o => { if (tl.toLowerCase().includes(o.toLowerCase().split(' ')[0])) setPurchaseTimeline(o); });
-        else fa.forEach(f => TIMELINE_OPTIONS.forEach(o => { if (f.answer.toLowerCase().includes(o.toLowerCase().split(' ')[0])) setPurchaseTimeline(o); }));
-
-        const fu = byQuestion(['tindak', 'follow', 'lanjut']);
-        if (fu) FOLLOWUP_OPTIONS.forEach(o => { if (fu.toLowerCase().includes(o.toLowerCase())) setFollowUp(o); });
-        else fa.forEach(f => FOLLOWUP_OPTIONS.forEach(o => { if (f.answer.toLowerCase().includes(o.toLowerCase())) setFollowUp(o); }));
-
-        const sk = byQuestion(['skor']);
-        if (sk) SKOR_OPTIONS.forEach(o => { if (sk.toLowerCase().includes(o.toLowerCase())) setSkor(o); });
-        else fa.forEach(f => SKOR_OPTIONS.forEach(o => { if (f.answer.toLowerCase().includes(o.toLowerCase())) setSkor(o); }));
-
-        if (!salesCode) {
-          const allText = [fields.name.value, fields.company.value, fields.jobTitle.value, fields.phone.value, fields.email.value, fields.softwareNeeds.value, ...fa.map(f => f.question + ' ' + f.answer)].join(' ');
-          const words = allText.split(/[\s,;:/()]+/).filter(Boolean);
-          for (const word of words) {
-            const clean = word.replace(/[^A-Za-z]/g, '').toUpperCase();
-            if (SALES_CODE_SET.has(clean) && word.length <= 3) { setSalesCode(clean); break; }
-          }
-        }
-      }
-    }, [activeJobId]);
 
     return (
       <div className="flex flex-col gap-3 max-w-md mx-auto w-full">
@@ -396,9 +356,13 @@ export function OcrCaptureView({ recentCustomers }: Props) {
             <CardTitle className="text-base">Qualify Lead</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="rounded-md border bg-muted/20 p-3 text-sm space-y-1">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Data Kartu Nama</p>
-              {[{ label: 'Nama', v: fields.name.value }, { label: 'Perusahaan', v: fields.company.value }, { label: 'Jabatan', v: fields.jobTitle.value }, { label: 'Telepon', v: fields.phone.value }, { label: 'Email', v: fields.email.value }].map(f => f.v?.trim() ? <p key={f.label}><span className="text-muted-foreground">{f.label}:</span> {f.v}</p> : null)}
+            <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Data Kartu Nama</p>
+              <div><Label className="text-xs text-muted-foreground">Nama</Label><Input value={editableName} onChange={e => setEditableName(e.target.value)} className="h-8 mt-0.5" /></div>
+              <div><Label className="text-xs text-muted-foreground">Perusahaan</Label><Input value={editableCompany} onChange={e => setEditableCompany(e.target.value)} className="h-8 mt-0.5" /></div>
+              <div><Label className="text-xs text-muted-foreground">Jabatan</Label><Input value={editableJobTitle} onChange={e => setEditableJobTitle(e.target.value)} className="h-8 mt-0.5" /></div>
+              <div><Label className="text-xs text-muted-foreground">Telepon</Label><Input value={editablePhone} onChange={e => setEditablePhone(e.target.value)} className="h-8 mt-0.5" /></div>
+              <div><Label className="text-xs text-muted-foreground">Email</Label><Input value={editableEmail} onChange={e => setEditableEmail(e.target.value)} className="h-8 mt-0.5" /></div>
             </div>
 
             <div className="flex flex-col gap-1.5 p-3 border rounded-md bg-muted/20">
@@ -550,11 +514,10 @@ export function OcrCaptureView({ recentCustomers }: Props) {
               return (
                 <button
                   key={job.id}
-                  onClick={() => { if (job.status !== 'pending' && job.status !== 'processing') setActiveJobId(job.id); }}
+                  onClick={() => setActiveJobId(job.id)}
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-lg border p-2 min-w-[80px] w-[80px] shrink-0 transition-all cursor-pointer",
-                    isActive ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-muted bg-card hover:border-muted-foreground/30",
-                    (job.status === 'pending' || job.status === 'processing') && "opacity-70 cursor-default"
+                    isActive ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-muted bg-card hover:border-muted-foreground/30"
                   )}
                 >
                   <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex items-center justify-center">
@@ -587,64 +550,76 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         </div>
       )}
 
-      {/* Idle state: Camera / Upload */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <ScanLine className="h-5 w-5" /> Capture Lead
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Button size="lg" className="h-20 text-base" onClick={() => cameraInputRef.current?.click()}>
-            <Camera className="h-6 w-6 mr-3" /> Foto Kartu Nama
-          </Button>
-          <Button size="lg" variant="outline" className="h-14" onClick={() => fileInputRef.current?.click()}>
-            <Upload className="h-5 w-5 mr-2" /> Unggah Gambar
-          </Button>
-          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFileSelected} />
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileSelected} />
-          <p className="text-xs text-muted-foreground text-center pt-1">
-            Foto kartu nama — proses di background, bisa foto lagi.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Active job: show status, hide camera */}
+      {activeJob && activeJob.status !== 'done' ? (
+        activeJob.status === 'processing' || activeJob.status === 'pending' ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-4 py-8">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <div className="text-center">
+                <p className="font-medium">Memproses OCR...</p>
+                <p className="text-sm text-muted-foreground mt-1">AI sedang membaca kartu nama</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setActiveJobId(null)}>
+                Tutup
+              </Button>
+            </CardContent>
+          </Card>
+        ) : activeJob.status === 'error' ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-3 py-8">
+              <XCircle className="h-10 w-10 text-destructive" />
+              <div className="text-center">
+                <p className="font-medium">Gagal memproses</p>
+                <p className="text-sm text-muted-foreground mt-1">{activeJob.error}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setActiveJobId(null)}>
+                Tutup
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null
+      ) : (
+        /* Idle state: Camera / Upload (only when no active or done-only) */
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ScanLine className="h-5 w-5" /> Capture Lead
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <Button size="lg" className="h-20 text-base" onClick={() => cameraInputRef.current?.click()}>
+                <Camera className="h-6 w-6 mr-3" /> Foto Kartu Nama
+              </Button>
+              <Button size="lg" variant="outline" className="h-14" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-5 w-5 mr-2" /> Unggah Gambar
+              </Button>
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFileSelected} />
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileSelected} />
+              <p className="text-xs text-muted-foreground text-center pt-1">
+                Foto kartu nama — proses di background, bisa foto lagi.
+              </p>
+            </CardContent>
+          </Card>
 
-      {/* Recent customers */}
-      {recentThree.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Lead Terbaru</h3>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.push('/dashboard?view=customer-manager')}>
-              Lihat Semua <ChevronRight className="h-3 w-3" />
-            </Button>
-          </div>
-          <div className="flex flex-col gap-2">
-            {recentThree.map((c) => (
-              <RecentCard key={c.id} customer={c} onClick={() => router.push(`/dashboard/customer/${c.id}`)} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Active job loading/error state */}
-      {activeJob?.status === 'processing' && (
-        <Card>
-          <CardContent className="flex items-center justify-center gap-3 py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Memproses OCR...</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeJob?.status === 'error' && (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-6">
-            <XCircle className="h-8 w-8 text-destructive" />
-            <p className="text-sm font-medium">Gagal memproses</p>
-            <p className="text-xs text-muted-foreground text-center">{activeJob.error}</p>
-            <Button variant="outline" size="sm" onClick={() => setActiveJobId(null)}>Tutup</Button>
-          </CardContent>
-        </Card>
+          {/* Recent customers */}
+          {recentThree.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Lead Terbaru</h3>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.push('/dashboard?view=customer-manager')}>
+                  Lihat Semua <ChevronRight className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {recentThree.map((c) => (
+                  <RecentCard key={c.id} customer={c} onClick={() => router.push(`/dashboard/customer/${c.id}`)} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
