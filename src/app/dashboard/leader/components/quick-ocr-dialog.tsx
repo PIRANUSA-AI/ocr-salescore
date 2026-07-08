@@ -61,7 +61,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
   const [currentSoftware, setCurrentSoftware] = useState<string[]>([]);
   const [otherSoftware, setOtherSoftware] = useState('');
   const [purchaseTimeline, setPurchaseTimeline] = useState('');
-  const [followUp, setFollowUp] = useState('');
+  const [followUp, setFollowUp] = useState<string[]>([]);
   const [skor, setSkor] = useState('');
   const [salesNotes, setSalesNotes] = useState('');
   const [eventName, setEventName] = useState('');
@@ -91,7 +91,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     setCurrentSoftware([]);
     setOtherSoftware('');
     setPurchaseTimeline('');
-    setFollowUp('');
+    setFollowUp([]);
     setSkor('');
     setSalesNotes('');
     setEventName('');
@@ -180,21 +180,23 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
       }
 
       const fu = byQuestion(['tindak', 'follow', 'lanjut']);
+      const fuMatches: string[] = [];
       if (fu) {
         for (const o of FOLLOWUP_OPTIONS) {
           if (fu.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(fu.toLowerCase())) {
-            setFollowUp(o); break;
+            fuMatches.push(o);
           }
         }
       } else {
         for (const f of fa) {
           for (const o of FOLLOWUP_OPTIONS) {
             if (f.answer.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(f.answer.toLowerCase())) {
-              setFollowUp(o); break;
+              fuMatches.push(o);
             }
           }
         }
       }
+      if (fuMatches.length) setFollowUp([...new Set(fuMatches)]);
 
       const sk = byQuestion(['skor']);
       if (sk) {
@@ -284,7 +286,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
       { question: 'Produk diminati', answer: selectedProducts.join(', ') },
       { question: 'Software saat ini', answer: selectedSoftware.join(', ') },
       { question: 'Rencana pembelian', answer: purchaseTimeline },
-      { question: 'Tindak lanjut', answer: followUp },
+      { question: 'Tindak lanjut', answer: followUp.join(', ') },
       { question: 'Skor', answer: skor },
     ].filter(qa => qa.answer);
 
@@ -508,14 +510,14 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
 
               <div className="space-y-2">
                 <Label>Tindak lanjut</Label>
-                <RadioGroup value={followUp} onValueChange={setFollowUp} className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {FOLLOWUP_OPTIONS.map((f) => (
                     <div key={f} className="flex items-center gap-2">
-                      <RadioGroupItem value={f} id={`q-fu-${f}`} />
+                      <Checkbox checked={followUp.includes(f)} onCheckedChange={(c) => setFollowUp(prev => c ? [...prev, f] : prev.filter(x => x !== f))} id={`q-fu-${f}`} />
                       <Label htmlFor={`q-fu-${f}`} className="font-normal">{f}</Label>
                     </div>
                   ))}
-                </RadioGroup>
+                </div>
               </div>
 
               <div className="space-y-2">

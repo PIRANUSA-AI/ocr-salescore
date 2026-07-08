@@ -104,7 +104,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const [currentSoftware, setCurrentSoftware] = useState<string[]>([]);
   const [otherSoftware, setOtherSoftware] = useState('');
   const [purchaseTimeline, setPurchaseTimeline] = useState('');
-  const [followUp, setFollowUp] = useState('');
+  const [followUp, setFollowUp] = useState<string[]>([]);
   const [skor, setSkor] = useState('');
   const [salesNotes, setSalesNotes] = useState('');
   const [salesCode, setSalesCode] = useState('');
@@ -189,8 +189,10 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     else fa.forEach(f => TIMELINE_OPTIONS.forEach(o => { if (f.answer.toLowerCase().includes(o.toLowerCase().split(' ')[0])) setPurchaseTimeline(o); }));
 
     const fu = byQuestion(['tindak', 'follow', 'lanjut']);
-    if (fu) FOLLOWUP_OPTIONS.forEach(o => { if (fu.toLowerCase().includes(o.toLowerCase())) setFollowUp(o); });
-    else fa.forEach(f => FOLLOWUP_OPTIONS.forEach(o => { if (f.answer.toLowerCase().includes(o.toLowerCase())) setFollowUp(o); }));
+    const fuMatches: string[] = [];
+    if (fu) FOLLOWUP_OPTIONS.forEach(o => { if (fu.toLowerCase().includes(o.toLowerCase())) fuMatches.push(o); });
+    else fa.forEach(f => FOLLOWUP_OPTIONS.forEach(o => { if (f.answer.toLowerCase().includes(o.toLowerCase())) fuMatches.push(o); }));
+    if (fuMatches.length) setFollowUp([...new Set(fuMatches)]);
 
     const sk = byQuestion(['skor']);
     if (sk) SKOR_OPTIONS.forEach(o => { if (sk.toLowerCase().includes(o.toLowerCase())) setSkor(o); });
@@ -215,7 +217,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     setCurrentSoftware([]);
     setOtherSoftware('');
     setPurchaseTimeline('');
-    setFollowUp('');
+    setFollowUp([]);
     setSkor('');
     setSalesNotes('');
     setSalesCode('');
@@ -274,7 +276,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       { question: 'Produk diminati', answer: selectedProducts.join(', ') },
       { question: 'Software saat ini', answer: selectedSoftware.join(', ') },
       { question: 'Rencana pembelian', answer: purchaseTimeline },
-      { question: 'Tindak lanjut', answer: followUp },
+      { question: 'Tindak lanjut', answer: followUp.join(', ') },
       { question: 'Skor', answer: skor },
     ].filter(qa => qa.answer);
 
@@ -459,14 +461,14 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
               <div>
                 <Label>Tindak lanjut</Label>
-                <RadioGroup value={followUp} onValueChange={setFollowUp} className="grid grid-cols-2 gap-2 mt-1">
+                <div className="grid grid-cols-2 gap-2 mt-1">
                   {FOLLOWUP_OPTIONS.map((f) => (
                     <div key={f} className="flex items-center gap-2">
-                      <RadioGroupItem value={f} id={`fu-${f}`} />
+                      <Checkbox checked={followUp.includes(f)} onCheckedChange={(c) => setFollowUp(prev => c ? [...prev, f] : prev.filter(x => x !== f))} id={`fu-${f}`} />
                       <Label htmlFor={`fu-${f}`} className="font-normal">{f}</Label>
                     </div>
                   ))}
-                </RadioGroup>
+                </div>
               </div>
 
               <div>
