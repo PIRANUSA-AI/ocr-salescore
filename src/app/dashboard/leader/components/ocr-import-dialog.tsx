@@ -178,38 +178,93 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
       });
 
       const fa = res.formAnswers ?? [];
-      const answerFor = (keywords: string[]) => {
+
+      const byQuestion = (keywords: string[]) => {
         for (const k of keywords) {
-          const match = fa.find(f => f.question.toLowerCase().includes(k));
-          if (match?.answer) return match.answer;
+          const m = fa.find(f => f.question.toLowerCase().includes(k));
+          if (m?.answer) return m.answer;
         }
         return '';
       };
-      const ind = matchOptions(answerFor(['industri']), INDUSTRI_OPTIONS);
-      setIndustri(ind.matched);
+
+      const byAnswer = (options: readonly string[]) => {
+        const found: string[] = [];
+        for (const f of fa) {
+          for (const opt of options) {
+            if (f.answer.toLowerCase().includes(opt.toLowerCase())) {
+              found.push(opt);
+            }
+          }
+        }
+        return found;
+      };
+
+      const indQ = byQuestion(['industri']);
+      const indA = byAnswer(INDUSTRI_OPTIONS);
+      const ind = matchOptions(indQ || indA.join(', '), INDUSTRI_OPTIONS);
+      setIndustri(ind.matched.length > 0 ? ind.matched : indA);
       if (ind.other) setOtherIndustri(ind.other);
-      const pi = matchOptions(answerFor(['produk', 'minat']) || res.softwareNeeds.value, PRODUCT_INTEREST);
-      setProductInterest(pi.matched);
+
+      const piQ = byQuestion(['produk', 'minat']);
+      const piA = byAnswer(PRODUCT_INTEREST);
+      const pi = matchOptions(piQ || piA.join(', ') || res.softwareNeeds.value, PRODUCT_INTEREST);
+      setProductInterest(pi.matched.length > 0 ? pi.matched : piA);
       if (pi.other) setOtherProduct(pi.other);
-      const sw = matchOptions(answerFor(['software', 'saat ini', 'digunakan']) || res.softwareNeeds.value, SOFTWARE_OPTIONS);
-      setCurrentSoftware(sw.matched);
+
+      const swQ = byQuestion(['software', 'saat ini', 'digunakan']);
+      const swA = byAnswer(SOFTWARE_OPTIONS);
+      const sw = matchOptions(swQ || swA.join(', ') || res.softwareNeeds.value, SOFTWARE_OPTIONS);
+      setCurrentSoftware(sw.matched.length > 0 ? sw.matched : swA);
       if (sw.other) setOtherSoftware(sw.other);
-      const tl = answerFor(['rencana', 'pembelian', 'kapan']);
-      for (const o of TIMELINE_OPTIONS) {
-        if (tl.toLowerCase().includes(o.toLowerCase().split(' ')[0]) || o.toLowerCase().includes(tl.toLowerCase())) {
-          setPurchaseTimeline(o); break;
+
+      const tl = byQuestion(['rencana', 'pembelian', 'kapan']);
+      if (tl) {
+        for (const o of TIMELINE_OPTIONS) {
+          if (tl.toLowerCase().includes(o.toLowerCase().split(' ')[0]) || o.toLowerCase().includes(tl.toLowerCase())) {
+            setPurchaseTimeline(o); break;
+          }
+        }
+      } else {
+        for (const f of fa) {
+          for (const o of TIMELINE_OPTIONS) {
+            if (f.answer.toLowerCase().includes(o.toLowerCase().split(' ')[0]) || o.toLowerCase().includes(f.answer.toLowerCase())) {
+              setPurchaseTimeline(o); break;
+            }
+          }
         }
       }
-      const fu = answerFor(['tindak', 'follow', 'lanjut']);
-      for (const o of FOLLOWUP_OPTIONS) {
-        if (fu.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(fu.toLowerCase())) {
-          setFollowUp(o); break;
+
+      const fu = byQuestion(['tindak', 'follow', 'lanjut']);
+      if (fu) {
+        for (const o of FOLLOWUP_OPTIONS) {
+          if (fu.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(fu.toLowerCase())) {
+            setFollowUp(o); break;
+          }
+        }
+      } else {
+        for (const f of fa) {
+          for (const o of FOLLOWUP_OPTIONS) {
+            if (f.answer.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(f.answer.toLowerCase())) {
+              setFollowUp(o); break;
+            }
+          }
         }
       }
-      const sk = answerFor(['skor']);
-      for (const o of SKOR_OPTIONS) {
-        if (sk.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(sk.toLowerCase())) {
-          setSkor(o); break;
+
+      const sk = byQuestion(['skor']);
+      if (sk) {
+        for (const o of SKOR_OPTIONS) {
+          if (sk.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(sk.toLowerCase())) {
+            setSkor(o); break;
+          }
+        }
+      } else {
+        for (const f of fa) {
+          for (const o of SKOR_OPTIONS) {
+            if (f.answer.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(f.answer.toLowerCase())) {
+              setSkor(o); break;
+            }
+          }
         }
       }
 

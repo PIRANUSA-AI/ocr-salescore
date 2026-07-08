@@ -44,7 +44,7 @@ const PRODUCT_INTEREST = ['ZWCAD', 'SketchUp', 'Archicad', 'Rendering'] as const
 const SOFTWARE_OPTIONS = ['AutoCAD', 'SketchUp', 'Revit', 'Archicad', 'ZWCAD'] as const;
 const TIMELINE_OPTIONS = ['< 3 bulan', '3–6 bulan', '> 6 bulan', 'Belum ada'] as const;
 const FOLLOWUP_OPTIONS = ['Demo', 'Penawaran', 'Kunjungan', 'Follow-up Call'] as const;
-const SKOR_OPTIONS = ['1', '2', '3', '4', '5'] as const;
+const SKOR_OPTIONS = ['High', 'Medium', 'Low'] as const;
 
 const READING_STEPS = [
   'Memproses gambar',
@@ -205,38 +205,102 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       });
 
       const fa = res.formAnswers ?? [];
-      const answerFor = (keywords: string[]) => {
+
+      // Strategy 1: Match by question keywords
+      const byQuestion = (keywords: string[]) => {
         for (const k of keywords) {
-          const match = fa.find(f => f.question.toLowerCase().includes(k));
-          if (match?.answer) return match.answer;
+          const m = fa.find(f => f.question.toLowerCase().includes(k));
+          if (m?.answer) return m.answer;
         }
         return '';
       };
-      const ind = matchOptions(answerFor(['industri', 'industri']), INDUSTRI_OPTIONS);
-      setIndustri(ind.matched);
+
+      // Strategy 2: Scan ALL answer texts directly for known option values
+      const byAnswer = (options: readonly string[]) => {
+        const found: string[] = [];
+        for (const f of fa) {
+          for (const opt of options) {
+            if (f.answer.toLowerCase().includes(opt.toLowerCase())) {
+              found.push(opt);
+            }
+          }
+        }
+        return found;
+      };
+
+      // Industri — try question match first, then direct answer scan
+      const indQ = byQuestion(['industri']);
+      const indA = byAnswer(INDUSTRI_OPTIONS);
+      const ind = matchOptions(indQ || indA.join(', '), INDUSTRI_OPTIONS);
+      setIndustri(ind.matched.length > 0 ? ind.matched : indA);
       if (ind.other) setOtherIndustri(ind.other);
-      const pi = matchOptions(answerFor(['produk', 'minat']) || res.softwareNeeds.value, PRODUCT_INTEREST);
-      setProductInterest(pi.matched);
+
+      // Produk — try question, then direct scan, then fallback to softwareNeeds from BC
+      const piQ = byQuestion(['produk', 'minat']);
+      const piA = byAnswer(PRODUCT_INTEREST);
+      const pi = matchOptions(piQ || piA.join(', ') || res.softwareNeeds.value, PRODUCT_INTEREST);
+      setProductInterest(pi.matched.length > 0 ? pi.matched : piA);
       if (pi.other) setOtherProduct(pi.other);
-      const sw = matchOptions(answerFor(['software', 'saat ini', 'digunakan']) || res.softwareNeeds.value, SOFTWARE_OPTIONS);
-      setCurrentSoftware(sw.matched);
+
+      // Software — try question, then direct scan, then fallback to softwareNeeds
+      const swQ = byQuestion(['software', 'saat ini', 'digunakan']);
+      const swA = byAnswer(SOFTWARE_OPTIONS);
+      const sw = matchOptions(swQ || swA.join(', ') || res.softwareNeeds.value, SOFTWARE_OPTIONS);
+      setCurrentSoftware(sw.matched.length > 0 ? sw.matched : swA);
       if (sw.other) setOtherSoftware(sw.other);
-      const tl = answerFor(['rencana', 'pembelian', 'kapan']);
-      for (const o of TIMELINE_OPTIONS) {
-        if (tl.toLowerCase().includes(o.toLowerCase().split(' ')[0]) || o.toLowerCase().includes(tl.toLowerCase())) {
-          setPurchaseTimeline(o); break;
+
+      // Timeline — try question match
+      const tl = byQuestion(['rencana', 'pembelian', 'kapan']);
+      if (tl) {
+        for (const o of TIMELINE_OPTIONS) {
+          if (tl.toLowerCase().includes(o.toLowerCase().split(' ')[0]) || o.toLowerCase().includes(tl.toLowerCase())) {
+            setPurchaseTimeline(o); break;
+          }
+        }
+      } else {
+        // Try direct answer scan
+        for (const f of fa) {
+          for (const o of TIMELINE_OPTIONS) {
+            if (f.answer.toLowerCase().includes(o.toLowerCase().split(' ')[0]) || o.toLowerCase().includes(f.answer.toLowerCase())) {
+              setPurchaseTimeline(o); break;
+            }
+          }
         }
       }
-      const fu = answerFor(['tindak', 'follow', 'lanjut']);
-      for (const o of FOLLOWUP_OPTIONS) {
-        if (fu.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(fu.toLowerCase())) {
-          setFollowUp(o); break;
+
+      // Follow-up — try question match
+      const fu = byQuestion(['tindak', 'follow', 'lanjut']);
+      if (fu) {
+        for (const o of FOLLOWUP_OPTIONS) {
+          if (fu.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(fu.toLowerCase())) {
+            setFollowUp(o); break;
+          }
+        }
+      } else {
+        for (const f of fa) {
+          for (const o of FOLLOWUP_OPTIONS) {
+            if (f.answer.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(f.answer.toLowerCase())) {
+              setFollowUp(o); break;
+            }
+          }
         }
       }
-      const sk = answerFor(['skor']);
-      for (const o of SKOR_OPTIONS) {
-        if (sk.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(sk.toLowerCase())) {
-          setSkor(o); break;
+
+      // Skor — try question match
+      const sk = byQuestion(['skor']);
+      if (sk) {
+        for (const o of SKOR_OPTIONS) {
+          if (sk.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(sk.toLowerCase())) {
+            setSkor(o); break;
+          }
+        }
+      } else {
+        for (const f of fa) {
+          for (const o of SKOR_OPTIONS) {
+            if (f.answer.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(f.answer.toLowerCase())) {
+              setSkor(o); break;
+            }
+          }
         }
       }
 
