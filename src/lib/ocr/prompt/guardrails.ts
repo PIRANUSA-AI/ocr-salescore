@@ -30,9 +30,6 @@ COMPANY:
 
 JOB TITLE:
 - TIDAK BOLEH format nomor HP atau email.
-- TIDAK BOLEH jabatan terpotong seperti "Project man".
-- Jika sangat jelas maksudnya "Project Manager", tulis "Project Manager" dengan confidence medium/low.
-- Jika tidak jelas, kosongkan.
 - Ciri: Manager, Direktur, Engineer, Staff, Owner, GM, VP, Head, Lead, Specialist, Supervisor, Consultant.
 
 DIVISION:
@@ -42,21 +39,30 @@ DIVISION:
 SOFTWARE NEEDS:
 - Ciri: nama software CAD/engineering yang dikenal.
 - Contoh: ZWCAD, AutoCAD, SketchUp, D5 Render, CATIA, SolidWorks, Archicad, Enscape, ZW3D, Revit.
-- TIDAK BOLEH nama perusahaan kecuali software memang bernama sama.
 
 ATURAN GLOBAL:
 - SKEPTIS 1000%. Jangan terima output yang tidak masuk akal hanya karena mirip bentuk tulisan.
 - JANGAN PERNAH mengisi value dengan "tidak ada", "-", "unknown", "none", "N/A", "null", atau "undefined".
 - JANGAN PERNAH mengarang data yang tidak terbaca di gambar.
 - Jika field terisi tapi jelas tidak masuk akal untuk field itu, kosongkan.
-- Jika ragu sebuah teks milik field mana, lebih baik tidak diisi.
 - Kosong lebih baik daripada salah paksa.
-- Jika field tidak jelas: value "", confidence "empty", alternatives [].
 
-FORM ANSWERS (formAnswers):
-- JANGAN PERNAH mengisi answer dengan pilihan yang TIDAK tercentang/ditandai secara visual.
-- JANGAN mengisi answer berdasarkan asumsi umum — hanya berdasarkan apa yang benar-benar ditandai/tertulis di gambar.
-- Untuk checkbox kosong (tidak ada satupun tercentang): answer = "".
-- Jika tercentang lebih dari satu pilihan, cantumkan semua yang tercentang dipisah koma.
-- question harus PERSIS dengan teks pertanyaan yang terbaca di gambar.`;
+CHECKBOX (CENTANG) — ATURAN LAPANGAN:
+- Sales di exhibition mencentang CEPAT dan SERING MELESET. Centang bisa: keluar kotak, mengenai dua opsi, atau hanya coret asal.
+- Jika ada coretan yang BERADA DI ATAS atau MENYENTUH kotak checkbox → ANGGAP dicentang. Tidak perlu centang sempurna di dalam kotak.
+- Jika coretan berada DI ANTARA dua checkbox → lihat posisi mayoritas coretan. Jika 60%+ coretan mengarah ke satu opsi, pilih opsi itu.
+- Jika coretan mengenai baris A tapi letak fisiknya lebih dekat ke baris B → pilih baris B (yang lebih dekat).
+- Coretan tanpa arah jelas (lingkaran besar, coret acak) yang mencakup area beberapa checkbox → centangkan SEMUA yang terkena coretan.
+- JANGAN mengabaikan centang hanya karena tidak rapi atau tidak di dalam kotak.
+
+FORM ANSWERS (formAnswers) — ATURAN UMUM:
+- question harus PERSIS dengan teks pertanyaan yang terbaca di gambar.
+- JANGAN PERNAH mengisi answer dengan pilihan yang TIDAK ada coretan/centang.
+- Untuk checkbox kosong: answer = "".
+- Jika tercentang lebih dari satu pilihan, cantumkan SEMUA dipisah koma.
+
+FORM ANSWERS — ATURAN CATATAN TANGAN:
+- Kolom catatan/kendala ditulis sales dalam hitungan detik — tulisannya bisa jelek, tercampur, atau tidak rapi.
+- Transkripsikan PERSIS apa adanya. Jangan perbaiki ejaan, jangan rapikan.
+- Kata yang tidak jelas: tulis "Tidak terbaca". Jangan menebak.`;
 }

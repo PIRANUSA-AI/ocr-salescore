@@ -10,13 +10,10 @@ Untuk setiap teks yang ditemukan, tentukan field yang paling cocok berdasarkan F
 📞 PHONE:
 - Pola: diawali +62, 62, 08, 021, 022, 031, dsb
 - Hanya berisi angka, spasi, tanda kurung, strip
-- Contoh: 0812-3456-7890, +62 897 8130 772, 0211234567
 
 📧 EMAIL:
-- CARI SETIAP "@" DI GAMBAR. Di mana pun ada simbol @, itu adalah EMAIL. Tidak ada pengecualian.
+- CARI SETIAP "@" DI GAMBAR. Di mana pun ada simbol @, itu adalah EMAIL.
 - Setiap teks yang mengandung @ WAJIB masuk ke field EMAIL atau alternatives email.
-- Pola: @ diikuti domain (.com, .co.id, .net, .ac.id, .or.id, .io, .id, .org)
-- Contoh: budi@gmail.com, fitriani@piranusa.com
 
 👤 NAME:
 - Nama orang (depan dan/atau belakang)
@@ -48,9 +45,19 @@ LANGKAH 3 — CROSS-VALIDASI:
 
 LANGKAH 4 — FORM DETECTION:
 Jika gambar berisi area form dengan pertanyaan (ceklist / isian), ekstrak setiap Q&A sebagai array formAnswers.
-- Gunakan teks pertanyaan PERSIS seperti yang tercetak sebagai "question".
-- Gunakan teks jawaban/tulisan tangan sebagai "answer".
-- Hanya ekstrak pertanyaan yang BENAR-BENAR TERLIHAT di gambar.
+
+DETEKSI CHECKBOX (CENTANG):
+- Sales di exhibition mencentang SANGAT CEPAT. Centang sering: keluar kotak, mengenai dua opsi, atau coret panjang.
+- CARI: coretan pensil/pulpen di DEKAT atau DI ATAS kotak checkbox. Tidak harus rapi di dalam.
+- Jika coretan mengenai kotak A dan B (di antara dua) → pilih berdasarkan PROXIMITY (posisi mayoritas coretan lebih dekat ke mana).
+- Jika coretan panjang mengenai 3+ opsi sekaligus → centangkan SEMUA yang terkena.
+- Coretan berbentuk lingkaran besar yang mencakup area checkbox → centangkan opsi yang ada di dalam lingkaran.
+- JANGAN lewatkan centang hanya karena bentuknya tidak sempurna.
+
+DETEKSI CATATAN TANGAN:
+- Cari tulisan tangan di area "Catatan", "Kendala", "Notes", atau kotak kosong di bagian bawah form.
+- Transkripsikan APA ADANYA. Jangan diperbaiki, jangan dirapikan.
+- Jika tidak terbaca: tulis "Tidak terbaca".
 
 LANGKAH 5 — MULTI-VALUE HANDLING:
 Jika ada LEBIH DARI SATU nilai untuk field yang sama (misal: 2 nomor HP, 2 email):

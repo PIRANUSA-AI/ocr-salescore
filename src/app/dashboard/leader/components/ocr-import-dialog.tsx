@@ -19,7 +19,17 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
+const SALES_PEOPLE = [
+  { code: 'LN', name: 'Lukman' },
+  { code: 'LS', name: 'Lody' },
+  { code: 'NU', name: 'Nurhayati' },
+  { code: 'RU', name: 'Rustini' },
+  { code: 'TK', name: 'Tika' },
+  { code: 'TA', name: 'Ita' },
+  { code: 'BR', name: 'Brist' },
+  { code: 'RQ', name: 'Rizqi' },
+];
+const SALES_CODE_SET = new Set(SALES_PEOPLE.map(p => p.code));
 
 function matchOptions(answer: string, options: readonly string[]): { matched: string[]; other: string } {
   if (!answer) return { matched: [], other: '' };
@@ -268,6 +278,19 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         }
       }
 
+      // Sales code — auto-detect isolated initials from all extracted text
+      if (!salesCode) {
+        const allText = [fields.name, fields.company, fields.jobTitle, fields.division, fields.phone, fields.email, fields.softwareNeeds, fields.address, ...fa.map(f => f.question + ' ' + f.answer)].join(' ');
+        const words = allText.split(/[\s,;:/()]+/).filter(Boolean);
+        for (const word of words) {
+          const clean = word.replace(/[^A-Za-z]/g, '').toUpperCase();
+          if (SALES_CODE_SET.has(clean) && word.length <= 3) {
+            setSalesCode(clean);
+            break;
+          }
+        }
+      }
+
       setStatus('result');
     } catch (err) {
       toast({
@@ -348,7 +371,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
       return;
     }
     if (!salesCode) {
-      toast({ variant: 'destructive', title: 'Pilih kode booth/team.' });
+      toast({ variant: 'destructive', title: 'Pilih sales.' });
       return;
     }
     if (!eventName.trim()) {
@@ -388,7 +411,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         products: [],
         assignedSalesId: null,
         assignedSalesName: null,
-        notes: `Kode booth: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
+        notes: `Sales: ${SALES_PEOPLE.find(p => p.code === salesCode)?.name ?? salesCode} (${salesCode})${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: result?.imageUrl || '',
         imageKey: '',
         acquisitionContext: {
@@ -527,16 +550,16 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
               <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Contoh: IBT 2026" disabled={status === 'saving'} />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="salesCode">Kode Booth/Team <span className="text-red-500">*</span></Label>
-              <div className="grid grid-cols-4 gap-2">
-                {SALES_CODES.map((code) => (
-                  <Button key={code} type="button" variant={salesCode === code ? 'default' : 'outline'} size="sm" className="active:translate-y-px" disabled={status === 'saving'} onClick={() => setSalesCode(code)}>
-                    {code}
-                  </Button>
-                ))}
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="salesCode">Sales <span className="text-red-500">*</span></Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {SALES_PEOPLE.map((p) => (
+                    <Button key={p.code} type="button" variant={salesCode === p.code ? 'default' : 'outline'} size="sm" className="active:translate-y-px text-xs" disabled={status === 'saving'} onClick={() => setSalesCode(p.code)}>
+                      {p.name} ({p.code})
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
 
             <div className="border-t pt-3 space-y-4">
               <div className="space-y-2">
