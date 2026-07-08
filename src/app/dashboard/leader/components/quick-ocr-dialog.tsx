@@ -415,14 +415,20 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
             </div>
 
             <div className="space-y-4 overflow-y-auto max-h-[60vh] pr-2">
-              {bcFields.some(f => fields[f.key]?.trim()) && (
-                <div className="rounded-md border bg-muted/20 p-3 text-sm space-y-1">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Data Kartu Nama</p>
-                  {bcFields.map(f => fields[f.key]?.trim() ? (
-                    <p key={f.key}><span className="text-muted-foreground">{f.label}:</span> {fields[f.key]}</p>
-                  ) : null)}
-                </div>
-              )}
+              <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Data Kartu Nama</p>
+                {bcFields.map(f => (
+                  <div key={f.key}>
+                    <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                    <Input
+                      value={fields[f.key] ?? ''}
+                      onChange={e => setFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      placeholder={f.key === 'name' ? 'Ketik nama manual...' : '-'}
+                      className="h-8 mt-0.5"
+                    />
+                  </div>
+                ))}
+              </div>
 
               <div>
                 <Label htmlFor="assignedSalesId">Nama Anda (Pemilik Lead) <span className="text-red-500">*</span></Label>
