@@ -278,6 +278,10 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         }
       }
 
+      // Catatan sales — auto-fill from form answers
+      const notesAns = fa.find((f: any) => f.question.toLowerCase().includes('catatan') || f.question.toLowerCase().includes('kendala') || f.question.toLowerCase().includes('notes'));
+      if (notesAns?.answer && !salesNotes) setSalesNotes(notesAns.answer);
+
       // Sales code — auto-detect isolated initials from all extracted text
       if (!salesCode) {
         const allText = [fields.name, fields.company, fields.jobTitle, fields.division, fields.phone, fields.email, fields.softwareNeeds, fields.address, ...fa.map(f => f.question + ' ' + f.answer)].join(' ');
@@ -411,7 +415,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         products: [],
         assignedSalesId: null,
         assignedSalesName: null,
-        notes: `Sales: ${SALES_PEOPLE.find(p => p.code === salesCode)?.name ?? salesCode} (${salesCode})${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
+        notes: `Sales: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: result?.imageUrl || '',
         imageKey: '',
         acquisitionContext: {
@@ -555,7 +559,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                 <div className="grid grid-cols-4 gap-2">
                   {SALES_PEOPLE.map((p) => (
                     <Button key={p.code} type="button" variant={salesCode === p.code ? 'default' : 'outline'} size="sm" className="active:translate-y-px text-xs" disabled={status === 'saving'} onClick={() => setSalesCode(p.code)}>
-                      {p.name} ({p.code})
+                      {p.code}
                     </Button>
                   ))}
                 </div>
