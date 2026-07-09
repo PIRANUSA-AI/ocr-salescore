@@ -14,12 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { compressImageToDataUri } from '@/lib/image-compress';
-import { createManualCustomer } from '@/app/actions/leader';
-import { createOcrJob, processOcrJob } from '@/app/actions/ocr';
+import { api } from '@/lib/api-client';
+import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { db } from '@/lib/firebase';
-import { collection, query, where, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
 import type { Customer } from '@/types';
@@ -35,8 +33,8 @@ interface OcrJobData {
   id: string;
   userId: string;
   status: 'pending' | 'processing' | 'done' | 'error';
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: string;
+  updatedAt: string;
   error?: string;
   result?: {
     name: { value: string; alternatives: string[]; confidence: Confidence };
@@ -114,30 +112,17 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     if (userProfile?.team) setCreatorTeam(userProfile.team);
   }, [userProfile]);
 
-  // Real-time listener for OCR jobs
+  // Poll OCR jobs from backend API
   useEffect(() => {
     if (!userProfile?.uid) return;
-    const q = query(
-      collection(db, 'jobs'),
-      where('userId', '==', userProfile.uid),
-      limit(20)
-    );
-    const unsub = onSnapshot(q, (snapshot) => {
-      const list: OcrJobData[] = [];
-      snapshot.forEach((d) => {
-        const data = d.data() as OcrJobData;
-        list.push({ ...data, id: d.id });
-      });
-      list.sort((a, b) => {
-        const ta = a.createdAt?.toMillis?.() ?? 0;
-        const tb = b.createdAt?.toMillis?.() ?? 0;
-        return tb - ta;
-      });
-      setJobs(list);
-    }, (err) => {
-      console.error('[OCR Queue] Firestore listener error:', err);
-    });
-    return () => unsub();
+    const poll = () => {
+      api.ocr.listJobs(20).then(r => {
+        setJobs(r.jobs as OcrJobData[]);
+      }).catch(() => {});
+    };
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
   }, [userProfile]);
 
   const activeJob = jobs.find(j => j.id === activeJobId) ?? null;
@@ -224,14 +209,27 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const processImage = useCallback(async (dataUri: string) => {
     if (!userProfile?.uid) return;
     const compressed = await compressImageToDataUri(dataUri);
-    const jobId = await createOcrJob(userProfile.uid);
+    const tempId = `ocr-${Date.now()}`;
 
-    setPreviews(prev => ({ ...prev, [jobId]: dataUri }));
-    setActiveJobId(jobId);
+    setPreviews(prev => ({ ...prev, [tempId]: dataUri }));
+    setActiveJobId(tempId);
     resetForm();
 
-    processOcrJob(jobId, compressed);
-  }, [userProfile, resetForm]);
+    try {
+      const result = await extractCustomerVision({ imageDataUri: compressed });
+      if ('rejected' in result) {
+        toast({ variant: 'destructive', title: 'Gambar Ditolak', description: result.visibleSummary || result.message });
+        return;
+      }
+      setJobs(prev => [{
+        id: tempId, userId: userProfile.uid, status: 'done', imageUrl: result.imageUrl || '',
+        result: result as any, createdAt: '', updatedAt: '',
+      }, ...prev]);
+    } catch (err: any) {
+      console.error('[OCR] process error:', err);
+      toast({ variant: 'destructive', title: 'OCR Gagal', description: err.message });
+    }
+  }, [userProfile, resetForm, toast]);
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -280,20 +278,20 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
     setStatus('saving');
     try {
-      await createManualCustomer({
+      await api.customers.create({
         name: editableName.trim(),
         company: editableCompany.trim(),
         jobTitle: editableJobTitle.trim(),
         phone: editablePhone.trim(),
         email: editableEmail.trim(),
         address: activeJob.result.address.value?.trim() || '',
-        creatorTeam,
+        team: creatorTeam,
+        pipelineStatus: 'Leads Generation 10%',
         products: [],
         assignedSalesId: matchedSales?.uid ?? null,
         assignedSalesName: matchedSales?.name ?? null,
-        notes: `Sales: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: jobFields.imageUrl || '',
-        imageKey: '',
+        imageKey: activeJob.result.imageUrl || '',
         acquisitionContext: {
           source: 'OCR',
           eventName: eventName.trim(),
