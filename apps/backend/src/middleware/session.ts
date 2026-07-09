@@ -21,7 +21,7 @@ export function setSessionCookie(c: Context, payload: SessionPayload): void {
   setCookie(c, SESSION_COOKIE, serializeSession(payload), {
     httpOnly: true,
     sameSite: 'lax',
-    secure: config.nodeEnv === 'production',
+    secure: false,
     maxAge: config.session.maxAge,
     path: '/',
   });

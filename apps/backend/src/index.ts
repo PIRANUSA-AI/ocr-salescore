@@ -1,6 +1,5 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { config } from './config.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { errorHandler } from './middleware/error.js';
@@ -20,7 +19,7 @@ import { reports } from './routes/reports.js';
 const app = new Hono();
 
 // ─── Global middleware ────────────────────────────────
-app.use('*', cors({ origin: '*', credentials: true }));
+// CORS not needed — nginx serves frontend + API on same domain
 app.use('*', sessionMiddleware);
 app.onError(errorHandler);
 
