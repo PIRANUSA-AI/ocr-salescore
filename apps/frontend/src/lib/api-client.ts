@@ -30,6 +30,12 @@ async function request<T>(
   return res.json();
 }
 
+function formatDate(value: any): string {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('id-ID');
+}
+
 // ─── Auth ────────────────────────────────────────────
 export const api = {
   auth: {
@@ -68,11 +74,26 @@ export const api = {
     create(data: any) {
       return request<{ customer: any }>('POST', '/customers', data);
     },
+    createManual(data: any) {
+      return request<{ success: boolean; customerId: string; status: 'created' | 'updated' }>('POST', '/customers/manual', data);
+    },
+    bulkCreate(data: any[], creatorTeam: 'AEC' | 'MFG') {
+      return request<{ success: boolean; created: number; updated: number; skipped: number; error?: string }>('POST', '/customers/bulk', { data, creatorTeam });
+    },
     update(id: string, data: any) {
       return request<{ success: boolean }>('PATCH', `/customers/${id}`, data);
     },
     delete(id: string) {
       return request<{ success: boolean }>('DELETE', `/customers/${id}`);
+    },
+    assignNote(id: string, salesId: string, salesName: string, note: string) {
+      return request<{ success: boolean }>('POST', `/customers/${id}/assign-note`, { salesId, salesName, note });
+    },
+    addGenerationHistory(id: string, historyItem: any) {
+      return request<{ success: boolean }>('POST', `/customers/${id}/generation-history`, { historyItem });
+    },
+    analyzeOpportunities() {
+      return request<{ tasks: any[] }>('POST', '/customers/opportunities/analyze');
     },
     updatePriority(id: string, newPriority: string) {
       return request<{ success: boolean }>('PATCH', `/customers/${id}/priority`, { newPriority });
@@ -190,11 +211,23 @@ export const api = {
     create(data: any) {
       return request<{ analysis: any }>('POST', '/analyses', data);
     },
+    analyzeWebinar(data: any) {
+      return request<any>('POST', '/analyses/webinar', data);
+    },
     update(id: string, data: any) {
       return request<{ success: boolean }>('PATCH', `/analyses/${id}`, data);
     },
-    delete(uniqueIdentifier: string) {
-      return request<{ success: boolean }>('DELETE', '/analyses', { uniqueIdentifier });
+    delete(id: string) {
+      return request<{ success: boolean }>('DELETE', `/analyses/${id}`);
+    },
+    assignProspects(id: string, data: { prospects: any[]; salesId: string; salesName: string }) {
+      return request<{ success: boolean; count: number }>('POST', `/analyses/${id}/assign-prospects`, data);
+    },
+    generateTopics(id: string) {
+      return request<{ success: boolean; recommendations?: any[]; error?: string }>('POST', `/analyses/${id}/topics`);
+    },
+    generateInsights(id: string) {
+      return request<{ success: boolean; insights?: any; error?: string }>('POST', `/analyses/${id}/insights`);
     },
   },
 
@@ -222,6 +255,85 @@ export const api = {
   reports: {
     salesRanking(team?: string) {
       return request<{ distribution: any[] }>('GET', `/reports/sales-ranking${team ? `?team=${team}` : ''}`);
+    },
+    ocr(params?: { range?: string; team?: string }) {
+      const qs = new URLSearchParams();
+      if (params?.range) qs.set('range', params.range);
+      if (params?.team) qs.set('team', params.team);
+      const q = qs.toString();
+      return request<{ report: any }>('GET', `/reports/ocr${q ? `?${q}` : ''}`);
+    },
+  },
+
+  // ─── Client-side export helpers backed by API data ─────────────
+  exports: {
+    async customersToExcel(filters?: { team?: 'AEC' | 'MFG'; salesId?: string; pipelineStatus?: string }) {
+      const [customersRes, salesRes] = await Promise.all([
+        api.customers.list(filters?.team ? { team: filters.team } : undefined),
+        api.users.listSales(filters?.team),
+      ]);
+
+      const salesCodeByUid = new Map(salesRes.users.map((s: any) => [s.uid, s.salesCode || '']));
+      const customers = customersRes.customers.filter((c: any) => {
+        if (filters?.salesId && c.assignedSalesId !== filters.salesId) return false;
+        if (filters?.pipelineStatus && c.pipelineStatus !== filters.pipelineStatus) return false;
+        return true;
+      });
+
+      return {
+        success: true,
+        data: customers.map((c: any) => ({
+          Nama: c.name,
+          Email: c.email,
+          Telepon: c.phone,
+          Perusahaan: c.company,
+          Jabatan: c.jobTitle,
+          Tim: c.team,
+          'Pipeline Status': c.pipelineStatus,
+          Sales: c.assignedSalesName || 'Belum Ditugaskan',
+          'Kode Sales': (c.assignedSalesId && salesCodeByUid.get(c.assignedSalesId)) || '',
+          'Potensi Revenue': c.potentialRevenue || 0,
+          Produk: c.products?.map((p: any) => p.name).join(', ') || '',
+          Sumber: c.acquisitionContext?.source || '',
+          Dibuat: formatDate(c.createdAt),
+          Diupdate: formatDate(c.updatedAt),
+        })),
+      };
+    },
+    async pipelineReport(team?: 'AEC' | 'MFG') {
+      const { customers } = await api.customers.list(team ? { team } : undefined);
+      const pipelineBreakdown: Record<string, { count: number; value: number; customers: string[] }> = {};
+
+      for (const c of customers as any[]) {
+        const status = c.pipelineStatus;
+        if (!pipelineBreakdown[status]) {
+          pipelineBreakdown[status] = { count: 0, value: 0, customers: [] };
+        }
+        pipelineBreakdown[status].count++;
+        pipelineBreakdown[status].value += c.potentialRevenue || 0;
+        pipelineBreakdown[status].customers.push(`${c.name} (${c.company})`);
+      }
+
+      const totalCustomers = customers.length;
+      const totalValue = (customers as any[]).reduce((sum, c) => sum + (c.potentialRevenue || 0), 0);
+      const wonDeals = (customers as any[]).filter(c => c.pipelineStatus === 'Won');
+      const wonValue = wonDeals.reduce((sum, c) => sum + (c.potentialRevenue || 0), 0);
+
+      return {
+        success: true,
+        report: {
+          generatedAt: new Date().toISOString(),
+          team: team || 'All',
+          summary: {
+            totalCustomers,
+            totalValue,
+            wonDeals: wonDeals.length,
+            wonValue,
+            conversionRate: totalCustomers > 0 ? ((wonDeals.length / totalCustomers) * 100).toFixed(1) : '0.0',
+          },
+          pipelineBreakdown,
+        },
+      };
     },
   },
 };

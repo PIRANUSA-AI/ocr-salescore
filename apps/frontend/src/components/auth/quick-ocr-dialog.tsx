@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
-import { createManualCustomer } from '@/app/actions/leader';
+import { api } from '@/lib/api-client';
 import { compressImageToDataUri } from '@/lib/image-compress';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -210,7 +210,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
 
         setStatus('saving');
         try {
-            await createManualCustomer({
+            await api.customers.createManual({
                 name: fields.name.trim(),
                 company: fields.company?.trim() || '',
                 jobTitle: fields.jobTitle?.trim() || '',

@@ -22,13 +22,11 @@ import {
     type GenerateWhatsappReplyOutput,
 } from '@/ai/flows/generate-whatsapp-reply-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { createManualCustomer, assignToSalesAndAddNote } from '@/app/actions/leader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type Customer, type UserProfile, type GenerationHistoryItem } from '@/types';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { formatDistanceToNow } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { addGenerationToHistory } from '@/app/actions/sales';
 import { api } from '@/lib/api-client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -284,7 +282,7 @@ export default function SalesAssistantPage() {
                 creatorTeam: userProfile.team,
             };
 
-            const customerResult = await createManualCustomer(customerPayload);
+            const customerResult = await api.customers.createManual(customerPayload);
             if (!customerResult.success) throw new Error("Gagal menyimpan data pelanggan.");
 
             const customerId = customerResult.customerId;
@@ -307,13 +305,7 @@ export default function SalesAssistantPage() {
                 type: 'whatsapp', // Default to whatsapp for now
             };
 
-            await addGenerationToHistory({
-                customerId,
-                customerName: data.customerName,
-                historyItem,
-                actorId: userProfile.uid,
-                actorName: userProfile.name
-            });
+            await api.customers.addGenerationHistory(customerId, historyItem);
 
             // Refresh customer list to include new/updated one
             api.customers.list().then(r => setAllCustomers(r.customers));
@@ -366,7 +358,7 @@ export default function SalesAssistantPage() {
         setIsAssigning(true);
         try {
             const salesName = salesTeam.find(s => s.uid === selectedSales)?.name || 'Unknown';
-            await assignToSalesAndAddNote(customerIdToAssign, selectedSales, salesName, message);
+            await api.customers.assignNote(customerIdToAssign, selectedSales, salesName, message);
             toast({
                 title: 'Tugas Berhasil Didelegasikan',
                 description: `Pelanggan telah ditugaskan ke ${salesName} dengan catatan pesan yang relevan.`,

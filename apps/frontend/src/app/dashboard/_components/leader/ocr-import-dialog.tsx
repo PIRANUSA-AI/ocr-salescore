@@ -12,7 +12,7 @@ import { Loader2, Camera, Upload, Check, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import type { ExtractResult } from '@/lib/ocr/extract';
-import { createManualCustomer } from '@/app/actions/leader';
+import { api } from '@/lib/api-client';
 import { compressImageToDataUri } from '@/lib/image-compress';
 import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { cn } from '@/lib/utils';
@@ -402,7 +402,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
     setStatus('saving');
     try {
-      await createManualCustomer({
+      await api.customers.createManual({
         name: fields.name.trim(),
         company: fields.company?.trim() || '',
         jobTitle: fields.jobTitle?.trim() || '',

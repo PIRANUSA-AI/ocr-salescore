@@ -81,6 +81,11 @@ export const customerRepo = {
     return rows.rows[0] ? rowToCustomer(rows.rows[0]) : null;
   },
 
+  async findByEmail(email: string): Promise<Customer | null> {
+    const rows = await query<CustomerRow>('SELECT * FROM customers WHERE lower(email) = lower($1) LIMIT 1', [email]);
+    return rows.rows[0] ? rowToCustomer(rows.rows[0]) : null;
+  },
+
   async create(data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<Customer> {
     const rows = await query<CustomerRow>(
       `INSERT INTO customers

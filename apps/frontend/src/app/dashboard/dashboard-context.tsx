@@ -4,9 +4,7 @@ import { type Customer, type UserProfile, type FollowUpTasks, type AnalysisHisto
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api-client';
-import { runAndSaveAiOpportunityTasks } from '@/app/actions/leader';
-import { getAnalysisHistory, deleteAnalysis, assignProspects, analyzeWebinar, generateTopicRecommendationsForAnalysis, generateWebinarInsights } from '@/app/actions/analyze';
-import type { WebinarAnalysisInput, WebinarAnalysisResult } from '@/app/actions/analyze';
+import type { WebinarAnalysisInput, WebinarAnalysisResult } from '@/lib/analysis-types';
 import { endOfDay, startOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
@@ -118,7 +116,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     if (!user || !userProfile) return;
     setIsAiTaskLoading(true);
     try {
-      const opportunityTasks = await runAndSaveAiOpportunityTasks();
+      const opportunityTasks = await api.customers.analyzeOpportunities().then(r => r.tasks);
       const salesTeamForFilter = salesTeam.length > 0 ? salesTeam : (await api.users.list({ role: 'Sales', team: userProfile.team }).then(r => r.users.map(u => ({ ...u, id: u.uid }))));
       const teamSalesIds = salesTeamForFilter.map(s => s.id);
       const customersForFilter = customers.length > 0 ? customers : (await api.customers.list({ team: userProfile.team }).then(r => r.customers.filter(c => !c.assignedSalesId || teamSalesIds.includes(c.assignedSalesId!))));
@@ -170,7 +168,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const handleDeleteAnalyses = async (analysisIds: string[]) => {
     setIsDeletingAnalysis(true);
     try {
-      await deleteAnalysis(analysisIds);
+      await Promise.all(analysisIds.map((id) => api.analyses.delete(id)));
       toast({ title: 'Sukses', description: `${analysisIds.length} riwayat analisis berhasil dihapus.` });
       refreshAllData();
     } catch (error) {
@@ -183,7 +181,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const handleAssignProspects = async (analysisId: string, prospects: ProspectData[], salesId: string, salesName: string) => {
     if (!user) return;
     try {
-      const result = await assignProspects({ analysisId, prospects, salesId, salesName, leaderId: user.uid });
+      const result = await api.analyses.assignProspects(analysisId, { prospects, salesId, salesName });
       toast({ title: 'Sukses!', description: `${result.count} prospek berhasil ditugaskan dan sekarang menjadi pelanggan.` });
       refreshAllData();
     } catch (error) {
@@ -194,7 +192,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const handleStartAnalysis = async (input: Omit<WebinarAnalysisInput, 'rsvpData'>) => {
     setIsAnalysisLoading(true);
     try {
-      const result = await analyzeWebinar(input);
+      const result = await api.analyses.analyzeWebinar(input);
       if (result.success) {
         refreshAllData();
         toast({ title: 'Analisis Dimulai', description: 'Data sedang diproses. Hasilnya akan segera muncul di tab Riwayat Analisis.', duration: 6000 });
@@ -215,7 +213,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsTopicLoading(analysisId);
     try {
-      const result = await generateTopicRecommendationsForAnalysis(analysisId);
+      const result = await api.analyses.generateTopics(analysisId);
       if (result.success) {
         toast({ title: 'Sukses', description: 'Rekomendasi topik berhasil dibuat.' });
         setAnalysisHistory(prev => prev.map(item =>
@@ -240,7 +238,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsInsightsLoading(analysisId);
     try {
-      const result = await generateWebinarInsights(analysisId);
+      const result = await api.analyses.generateInsights(analysisId);
       if (result.success && result.insights) {
         toast({ title: 'Sukses', description: 'Ringkasan webinar berhasil dibuat oleh AI.' });
         const newInsights = result.insights;

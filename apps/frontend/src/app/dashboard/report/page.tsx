@@ -2,12 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import {
-  getOcrReportData,
-  type OcrReportData,
-  type OcrTimeRange,
-  type OcrTeamFilter,
-} from '@/app/actions/report';
+import { api } from '@/lib/api-client';
+import type { OcrReportData, OcrTimeRange, OcrTeamFilter } from '@/lib/report-types';
 import { Loader2, ScanLine, Zap, UserX, Trophy } from 'lucide-react';
 import { MetricCard } from '@/components/ui/metric-card';
 import { PageHeader } from '@/components/ui/page-header';
@@ -54,8 +50,9 @@ export default function ReportPage() {
   useEffect(() => {
     if (!userProfile) return;
     setOcrLoading(true);
-    getOcrReportData(userProfile, ocrRange, ocrTeam)
-      .then(setOcrData)
+    const team = userProfile.role === 'Leader' ? userProfile.team : ocrTeam;
+    api.reports.ocr({ range: ocrRange, team })
+      .then((res) => setOcrData(res.report as OcrReportData))
       .catch((err) => {
         console.error('[OCR Report]', err);
         setOcrData(null);

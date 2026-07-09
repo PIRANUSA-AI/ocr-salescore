@@ -22,7 +22,7 @@ import { Loader2, Mail, CheckCircle2, ChevronRight, ChevronLeft, Search, Copy, E
 
 
 import { Customer } from '@/types';
-import { getAllCustomers } from '@/app/actions/leader';
+import { api } from '@/lib/api-client';
 import { generateEmailBlast, EmailGenerationInput } from '@/ai/flows/generate-email-blast-flow';
 import { saveEmailBlastHistory } from '@/app/actions/email-blast'; // Server Action
 import { useForm, Controller } from 'react-hook-form';
@@ -207,7 +207,9 @@ export default function EmailBlastView() {
             setIsLoadingCustomers(true);
             try {
                 // Pass userProfile to ensure data isolation (AEC vs MFG)
-                const data = await getAllCustomers(userProfile);
+                const data = await api.customers.list(
+                    userProfile.role === 'Superadmin' ? undefined : { team: userProfile.team }
+                ).then((res) => res.customers);
                 setCustomers(data);
             } catch (error) {
                 console.error("Failed to fetch customers", error);

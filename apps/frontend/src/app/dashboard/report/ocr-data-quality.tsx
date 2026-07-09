@@ -1,6 +1,6 @@
 'use client';
 
-import type { OcrQualityReport } from '@/app/actions/report';
+import type { OcrQualityReport } from '@/lib/report-types';
 import { MailX, PhoneOff, MailWarning } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

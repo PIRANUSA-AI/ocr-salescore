@@ -9,7 +9,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Download, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
-import { exportCustomersToExcel, generatePipelineReportData } from '@/app/actions/export-actions';
+import { api } from '@/lib/api-client';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -30,7 +30,7 @@ export function ExportButton({ team, className, iconOnly = false }: ExportButton
     const handleExportExcel = async () => {
         setLoading(true);
         try {
-            const result = await exportCustomersToExcel({ team });
+            const result = await api.exports.customersToExcel({ team });
             if (result.success && result.data) {
                 const worksheet = XLSX.utils.json_to_sheet(result.data);
                 const workbook = XLSX.utils.book_new();
@@ -52,7 +52,7 @@ export function ExportButton({ team, className, iconOnly = false }: ExportButton
     const handleExportPDF = async () => {
         setLoading(true);
         try {
-            const result = await generatePipelineReportData(team);
+            const result = await api.exports.pipelineReport(team);
             if (result.success && result.report) {
                 const doc = new jsPDF();
                 const report = result.report;

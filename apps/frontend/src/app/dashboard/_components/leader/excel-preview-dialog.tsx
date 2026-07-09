@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { createBulkCustomers } from '@/app/actions/leader';
+import { api } from '@/lib/api-client';
 
 interface ExcelPreviewDialogProps {
     isOpen: boolean;
@@ -39,7 +39,7 @@ export function ExcelPreviewDialog({ isOpen, onOpenChange, data, onImportSuccess
         
         setIsLoading(true);
         try {
-            const result = await createBulkCustomers(data, creatorTeam);
+            const result = await api.customers.bulkCreate(data, creatorTeam);
             if (result.success) {
                 toast({
                     title: 'Impor Berhasil',

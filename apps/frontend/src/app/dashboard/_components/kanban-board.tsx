@@ -6,7 +6,7 @@ import type { Customer, PipelineStatus } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { PIPELINE_STAGES } from '@/types';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { updatePipelineStatus } from '@/app/actions/sales';
+import { api } from '@/lib/api-client';
 import { useAuth } from '@/hooks/use-auth';
 import { useDashboard } from '../dashboard-context';
 import { User, Package, ChevronDown, Loader2, ChevronRight } from 'lucide-react';
@@ -203,13 +203,7 @@ export default function KanbanBoard({ customers, onCustomersChange, openCustomer
         setBoardData(newBoardData);
 
         try {
-            await updatePipelineStatus({
-                customerId: draggableId,
-                customerName: movedCard.name,
-                newStatus: endColumnId,
-                actorId: userProfile.uid,
-                actorName: userProfile.name,
-            });
+            await api.customers.update(draggableId, { pipelineStatus: endColumnId });
             toast({ title: "Status Diperbarui", description: `Deal dipindahkan ke ${endColumnId}.` });
             context.refreshAllData();
         } catch (error) {

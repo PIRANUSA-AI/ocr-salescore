@@ -18,7 +18,7 @@ import { ExcelPreviewDialog } from '../../_components/leader/excel-preview-dialo
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { deleteCustomer } from '@/app/actions/leader';
+import { api } from '@/lib/api-client';
 // import { EmailBlastDialog } from '../../_components/leader/email-blast-dialog'; // Removed
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
@@ -216,7 +216,7 @@ export const MyCustomersView = () => {
     const handleDeleteCustomer = async (customerId: string, customerName: string) => {
         setIsDeletingCustomerId(customerId);
         try {
-            await deleteCustomer(customerId);
+            await api.customers.delete(customerId);
             toast({ title: 'Sukses', description: `Pelanggan "${customerName}" berhasil dihapus.` });
             setCustomers(prev => prev.filter(c => c.id !== customerId));
         } catch (error) {

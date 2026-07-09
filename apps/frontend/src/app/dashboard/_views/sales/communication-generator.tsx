@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Smartphone, Mail, Send, History, Sparkles, Copy } from 'lucide-react';
 import { type Customer, type UserProfile, type GenerationHistoryItem } from '@/types';
 import { generateCommunicationForCustomer, type CommunicationGenerationInput } from '@/ai/flows/generate-communication-flow';
-import { addGenerationToHistory } from '@/app/actions/sales';
+import { api } from '@/lib/api-client';
 import { formatDistanceToNow } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -95,13 +95,7 @@ export function CommunicationGenerator({ customer, salesPerson, onHookGenerated 
         recommendations: [result.generatedHook],
       };
 
-      await addGenerationToHistory({
-        customerId: customer.id,
-        customerName: customer.name,
-        historyItem,
-        actorId: salesPerson.uid,
-        actorName: salesPerson.name,
-      });
+      await api.customers.addGenerationHistory(customer.id, historyItem);
 
       const newHistoryItemWithDate: GenerationHistoryItem = {
         ...historyItem,

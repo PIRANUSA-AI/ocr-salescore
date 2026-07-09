@@ -102,4 +102,8 @@ export const analysisRepo = {
   async deleteByUniqueIdentifier(identifier: string): Promise<void> {
     await query('DELETE FROM analyses WHERE unique_identifier = $1', [identifier]);
   },
+
+  async deleteById(id: string): Promise<void> {
+    await query('DELETE FROM analyses WHERE id = $1', [id]);
+  },
 };

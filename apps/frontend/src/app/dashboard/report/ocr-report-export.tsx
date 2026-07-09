@@ -8,8 +8,8 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { exportCustomersToExcel } from '@/app/actions/export-actions';
-import { type OcrReportData } from '@/app/actions/report';
+import { api } from '@/lib/api-client';
+import type { OcrReportData } from '@/lib/report-types';
 
 interface Props {
   ocrData: OcrReportData;
@@ -158,7 +158,7 @@ export function OcrReportExport({ ocrData, periodeLabel, timLabel, excelTeam }: 
   const handleExportExcel = async () => {
     setLoading('excel');
     try {
-      const result = await exportCustomersToExcel({ team: excelTeam });
+      const result = await api.exports.customersToExcel({ team: excelTeam });
       if (!result.success || !result.data || result.data.length === 0) {
         toast({ variant: 'destructive', title: 'Export Gagal', description: 'Tidak ada data untuk diekspor.' });
         return;

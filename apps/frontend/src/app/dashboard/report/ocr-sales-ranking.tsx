@@ -3,7 +3,7 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Crown, AlertTriangle } from 'lucide-react';
-import type { OcrSalesRow } from '@/app/actions/report';
+import type { OcrSalesRow } from '@/lib/report-types';
 
 interface Props {
   rows: OcrSalesRow[];

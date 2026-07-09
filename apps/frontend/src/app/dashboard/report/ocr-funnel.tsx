@@ -1,6 +1,6 @@
 'use client';
 
-import type { OcrFunnelStage } from '@/app/actions/report';
+import type { OcrFunnelStage } from '@/lib/report-types';
 import { cn } from '@/lib/utils';
 
 interface Props {

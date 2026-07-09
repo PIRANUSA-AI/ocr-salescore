@@ -16,7 +16,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { handleSignupAction } from '@/app/actions/auth';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Email tidak valid.' }),
@@ -129,11 +128,8 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
     const finalPassword = data.password.length < 6 ? data.password.repeat(6).slice(0, 6) : data.password;
     const submissionData = { ...data, password: finalPassword };
 
-    const result =
-      AUTH_MODE === 'local'
-        ? await api.auth.signup(submissionData).then(() => ({ success: true as const, error: null }))
-            .catch((e: Error) => ({ success: false as const, error: e.message }))
-        : await handleSignupAction(submissionData);
+    const result = await api.auth.signup(submissionData).then(() => ({ success: true as const, error: null }))
+      .catch((e: Error) => ({ success: false as const, error: e.message }));
     setIsLoading(false);
     if (result.success) {
       toast({ title: 'Pendaftaran Berhasil', description: 'Silakan masuk untuk melanjutkan.' });
