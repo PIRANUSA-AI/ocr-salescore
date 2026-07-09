@@ -161,7 +161,7 @@ export default function CustomerDetailPage() {
                 });
             } else {
                 toast({ variant: 'destructive', title: 'Pelanggan tidak ditemukan' });
-                router.push('/dashboard?view=my-customers');
+                router.push(`/dashboard?view=${userProfile?.role === 'Leader' ? 'customer-manager' : userProfile?.role === 'Superadmin' ? 'global-customers' : 'sales-home'}`);
             }
         } catch (err) {
             toast({ variant: 'destructive', title: 'Gagal memuat data', description: (err as Error).message });
@@ -413,7 +413,7 @@ export default function CustomerDetailPage() {
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <Button type="button" variant="outline" size="icon" asChild>
-                            <Link href={`/dashboard?view=${userProfile?.role === 'Leader' ? 'customer-manager' : 'my-customers'}`}>
+                            <Link href={`/dashboard?view=${userProfile?.role === 'Leader' ? 'customer-manager' : userProfile?.role === 'Superadmin' ? 'global-customers' : 'sales-home'}`}>
                                 <ArrowLeft className="h-4 w-4" />
                             </Link>
                         </Button>

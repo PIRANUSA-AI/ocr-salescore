@@ -16,13 +16,14 @@ import ReportPage from './report/page';
 import OcrCaptureViewWrapper from './leader/views/ocr-capture-view';
 import DealsView from './leader/views/deals-view';
 import { MyCustomersView } from './sales/my-customers-view';
+import { SalesHomeView } from './sales/sales-home-view';
 import { UserManager } from './superadmin/user-manager';
 import { GlobalCustomerManager } from './superadmin/global-customer-manager';
 
 const OCR_FOCUS = (process.env.NEXT_PUBLIC_OCR_FOCUS_MODE || 'true') === 'true';
 const LOADER = <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
-const VALID_VIEWS = new Set(['ocr-capture', 'customer-manager', 'my-customers', 'report', 'user-manager', 'global-customers', 'deals']);
+const VALID_VIEWS = new Set(['ocr-capture', 'customer-manager', 'my-customers', 'report', 'user-manager', 'global-customers', 'deals', 'sales-home']);
 
 function DashboardUI() {
   const { userProfile, loading } = useAuth();
@@ -34,13 +35,15 @@ function DashboardUI() {
 
   const defaultView = useMemo(() => {
     if (!userProfile) return 'customer-manager';
-    if (OCR_FOCUS && userProfile.role !== 'Superadmin') return userProfile.role === 'Sales' ? 'my-customers' : 'customer-manager';
-    return { Leader: 'customer-manager', Sales: 'my-customers', Superadmin: 'report' }[userProfile.role] || 'customer-manager';
+    if (OCR_FOCUS && userProfile.role !== 'Superadmin') return userProfile.role === 'Sales' ? 'sales-home' : 'customer-manager';
+    return { Leader: 'customer-manager', Sales: 'sales-home', Superadmin: 'report' }[userProfile.role] || 'customer-manager';
   }, [userProfile]);
 
   useEffect(() => {
     if (!loading && userProfile) {
-      const viewParam = searchParams.get('view');
+      const raw = searchParams.get('view');
+      // Sales: landing default kini Beranda; arahkan my-customers (URL basi/back) ke sales-home
+      const viewParam = userProfile.role === 'Sales' && raw === 'my-customers' ? 'sales-home' : raw;
       setActiveView(viewParam && VALID_VIEWS.has(viewParam) ? viewParam : defaultView);
     }
   }, [loading, userProfile, searchParams, defaultView]);
@@ -57,6 +60,7 @@ function DashboardUI() {
       'ocr-capture': <OcrCaptureViewWrapper />,
       'customer-manager': <CustomerManagementView />,
       'my-customers': <MyCustomersView />,
+      'sales-home': <SalesHomeView />,
       'deals': <DealsView />,
       'report': <ReportPage />,
       'user-manager': <UserManager />,

@@ -14,7 +14,7 @@ import {
     SidebarSeparator,
     useSidebar,
 } from "@/components/ui/sidebar";
-import { ScanLine, Users, BarChart3, Settings, ShieldCheck, Kanban } from 'lucide-react';
+import { ScanLine, Users, BarChart3, Settings, ShieldCheck, Kanban, Home } from 'lucide-react';
 
 interface AppSidebarProps {
     activeView: string;
@@ -30,10 +30,14 @@ export function AppSidebar({ activeView, onViewChange }: AppSidebarProps) {
     const menuItems = useMemo(() => {
         if (!userProfile) return [];
         const isSuperadmin = userProfile.role === 'Superadmin';
-        const base = [
+        const base = [];
+        if (userProfile.role === 'Sales') {
+            base.push({ id: 'sales-home', label: 'Beranda', icon: Home });
+        }
+        base.push(
             { id: 'ocr-capture', label: 'Scan', icon: ScanLine },
             { id: isSuperadmin ? 'global-customers' : 'customer-manager', label: 'Customers', icon: Users },
-        ];
+        );
         if (userProfile.role === 'Leader' || userProfile.role === 'Sales') {
             base.push({ id: 'deals', label: 'Pipeline', icon: Kanban });
         }
