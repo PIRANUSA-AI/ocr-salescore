@@ -1,0 +1,96 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  typecheck-and-build:
+    name: Typecheck & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (frontend + backend)
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build backend
+        run: npm --workspace @salescore/backend run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            apps/frontend/.next/standalone/
+            apps/frontend/.next/static/
+            apps/frontend/public/
+            apps/backend/dist/
+            node_modules/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to VPS
+    needs: typecheck-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: /tmp/salescore-build
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT || '22' }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+
+            echo ">>> Stopping services..."
+            pm2 stop salescore-frontend salescore-backend 2>/dev/null || true
+
+            echo ">>> Syncing code..."
+            cd /opt/salescore
+            git pull origin main
+
+            echo ">>> Installing dependencies..."
+            npm ci
+
+            echo ">>> Running database migrations..."
+            psql -h $PGHOST -U $PGUSER -d $PGDATABASE -f apps/backend/db/001_initial.sql 2>/dev/null || true
+
+            echo ">>> Building frontend..."
+            npm run build
+
+            echo ">>> Building backend..."
+            npm --workspace @salescore/backend run build
+
+            echo ">>> Starting services..."
+            pm2 start deploy/ecosystem.config.cjs 2>/dev/null || pm2 restart salescore-frontend salescore-backend
+            pm2 save
+
+            echo ">>> Deployment complete!"

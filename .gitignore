@@ -8,6 +8,7 @@ workspace/
 
 # Dependencies
 node_modules/
+apps/*/node_modules/
 
 # Firebase
 .firebase/
@@ -23,6 +24,8 @@ firebase-debug.log
 # Sistem
 .DS_Store
 thumbs.db
+.agents
+AGENTS.md
 
 # Log & artifacts (jangan di-commit)
 *.log
@@ -41,5 +44,5 @@ verify-*.mjs
 deploy-rules.mjs
 
 # Gambar test berisi data pribadi asli (jangan ke repo public)
-public/test-gambar.*
+apps/frontend/public/test-gambar.*
 .vercel

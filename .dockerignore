@@ -1,8 +1,15 @@
 Dockerfile
 .dockerignore
 node_modules
+apps/*/node_modules
 npm-debug.log
 README.md
 .next
+apps/*/.next
 .git
+.env
+.env.*
 .env*.local
+apps/*/.env
+apps/*/.env.*
+apps/*/.env*.local

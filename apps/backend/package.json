@@ -1,0 +1,33 @@
+{
+  "name": "@salescore/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "migrate:firestore": "tsx scripts/migrate-from-firestore.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1078.0",
+    "@aws-sdk/s3-request-presigner": "^3.1079.0",
+    "bcryptjs": "^3.0.3",
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.7.5",
+    "ioredis": "^5.11.1",
+    "openai": "^4.86.2",
+    "pg": "^8.13.1",
+    "firebase-admin": "^12.3.0",
+    "sharp": "^0.35.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.1",
+    "typescript": "^5"
+  }
+}
