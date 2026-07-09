@@ -16,7 +16,7 @@ export default function OcrCaptureViewWrapper() {
     .slice()
     .sort((a, b) => {
       const getTime = (c: any) => {
-        const raw = c.createdAt || c.updatedAt;
+        const raw = c.updatedAt || c.createdAt;
         if (!raw) return 0;
         if (typeof raw === 'object' && raw.seconds) return raw.seconds * 1000;
         return new Date(raw).getTime() || 0;

@@ -156,8 +156,12 @@ export function SalesAssistantManager() {
     const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
 
     useEffect(() => {
-        getSalesUsers().then(setSalesTeam);
-        getCustomers().then(setAllCustomers);
+        getSalesUsers().then(setSalesTeam).catch(err => {
+            toast({ variant: 'destructive', title: 'Gagal Memuat Tim Sales', description: (err as Error).message });
+        });
+        getCustomers().then(setAllCustomers).catch(err => {
+            toast({ variant: 'destructive', title: 'Gagal Memuat Pelanggan', description: (err as Error).message });
+        });
     }, []);
 
     const handleSelectCustomer = (customerId: string) => {

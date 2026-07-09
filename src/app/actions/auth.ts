@@ -7,6 +7,8 @@ import type { UserProfile } from '@/types';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { logActivity } from './activity';
 import { createNotification } from './notification';
+import { revalidateTag } from 'next/cache';
+import { USERS_CACHE_TAG } from '@/lib/cache-tags';
 
 const leaderSignupSchema = z.object({
   name: z.string().min(1),
@@ -72,6 +74,7 @@ export async function handleSignupAction(formData: z.infer<typeof signupSchema>)
     });
 
     console.log(`[Action: handleSignupAction] Pengguna baru berhasil dibuat: ${userRecord.uid} dengan peran ${role}`);
+    revalidateTag(USERS_CACHE_TAG);
     return { success: true, error: null };
 
   } catch (error: any) {

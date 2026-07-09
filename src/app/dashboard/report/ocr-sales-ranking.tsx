@@ -77,7 +77,7 @@ export function OcrSalesRanking({ rows }: Props) {
         {/* Sub-stats */}
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            <span>Baru hari ini: <span className="font-medium text-foreground/80">{row.newToday}</span></span>
+            <span>Aktif hr ini: <span className="font-medium text-foreground/80">{row.activeToday}</span></span>
             <span>Won: <span className="font-medium text-foreground/80">{row.won}</span></span>
             <span>Konversi: <span className="font-medium text-foreground/80">{row.conversionRate.toFixed(0)}%</span></span>
           </div>

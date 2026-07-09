@@ -7,6 +7,9 @@ import { adminDb } from '@/lib/firebase-admin';
 import type { Customer, CustomerNotes } from '@/types';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
+import { unstable_cache } from 'next/cache';
+import { isResourceExhausted, QUOTA_EXCEEDED_MESSAGE } from '@/lib/firestore-errors';
+import { CUSTOMERS_CACHE_TAG } from '@/lib/cache-tags';
 
 /**
  * HELPER: Mengkonversi berbagai format tanggal (Timestamp, String, Date) menjadi ISO String dengan aman.
@@ -79,12 +82,16 @@ function serializeNotes(notes: any): CustomerNotes {
  * @param filters - Optional filters, e.g., { assignedSalesId: 'some-id' }.
  * @returns A promise that resolves to an array of Customer objects.
  */
-export async function getCustomers(filters?: { assignedSalesId?: string; team?: 'AEC' | 'MFG' }): Promise<Customer[]> {
-    console.log('[Action: getCustomers] Fetching customers with filters:', filters);
-    try {
-        let query: FirebaseFirestore.Query = adminDb.collection('customers');
-
-        const snapshot = await query.get();
+/**
+ * Raw Firestore fetch + serialization, with no filters applied.
+ * Cached for 60s so switching filters/pages doesn't re-hit Firestore;
+ * invalidated immediately on any customer create/update/delete via
+ * revalidateTag(CUSTOMERS_CACHE_TAG).
+ */
+const getAllCustomersCached = unstable_cache(
+    async (): Promise<Customer[]> => {
+        console.log('[Action: getCustomers] Fetching customers from Firestore (cache miss).');
+        const snapshot = await adminDb.collection('customers').get();
         if (snapshot.empty) {
             console.log('[Action: getCustomers] No customers found in the database.');
             return [];
@@ -137,14 +144,33 @@ export async function getCustomers(filters?: { assignedSalesId?: string; team?: 
             } as Customer;
         });
 
-        // Step 2: Filter the results in-memory on the server.
+        console.log(`[Action: getCustomers] SUKSES. Ditemukan ${allCustomers.length} pelanggan (cache miss).`);
+        return allCustomers;
+    },
+    ['all-customers'],
+    { tags: [CUSTOMERS_CACHE_TAG], revalidate: 60 }
+);
+
+/**
+ * Fetches and serializes a list of customers based on optional filters.
+ * The Firestore read itself is cached (60s); filters/sort are applied
+ * in-memory on every call so they're always fresh and never blow up the cache key space.
+ * @param filters - Optional filters, e.g., { assignedSalesId: 'some-id' }.
+ * @returns A promise that resolves to an array of Customer objects.
+ */
+export async function getCustomers(filters?: { assignedSalesId?: string; team?: 'AEC' | 'MFG' }): Promise<Customer[]> {
+    console.log('[Action: getCustomers] Fetching customers with filters:', filters);
+    try {
+        const allCustomers = await getAllCustomersCached();
+
+        // Step 1: Filter the results in-memory on the server.
         const filteredCustomers = allCustomers.filter(customer => {
             const teamMatch = !filters?.team || customer.team === filters.team;
             const salesMatch = !filters?.assignedSalesId || customer.assignedSalesId === filters.assignedSalesId;
             return teamMatch && salesMatch;
         });
 
-        // Step 3: Sort the final results by date.
+        // Step 2: Sort the final results by date.
         const sortedCustomers = filteredCustomers.sort((a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         );
@@ -154,6 +180,9 @@ export async function getCustomers(filters?: { assignedSalesId?: string; team?: 
     } catch (error) {
         // Log error yang lebih detail agar kita tahu penyebab pastinya
         console.error('[Action: getCustomers] !!! ERROR !!!', error);
+        if (isResourceExhausted(error)) {
+            throw new Error(QUOTA_EXCEEDED_MESSAGE);
+        }
         throw new Error('Gagal mengambil data pelanggan.');
     }
 }

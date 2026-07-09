@@ -11,9 +11,11 @@ import { PRODUCT_LIST, SUBSCRIPTION_PRODUCTS, PIPELINE_STAGES, CUSTOMER_SOURCES 
 import { differenceInDays, add, isWithinInterval } from 'date-fns';
 import { generateOpportunityForCustomer } from '@/ai/flows/generate-opportunity-flow';
 import { getCustomers } from './customer';
+import { CUSTOMERS_CACHE_TAG } from '@/lib/cache-tags';
 import { getSalesUsers } from './user';
 import type { UserProfile } from '@/types';
 import { createNotification } from './notification';
+import { revalidateTag } from 'next/cache';
 
 
 const ProductSchema = z.object({
@@ -217,6 +219,7 @@ export async function createManualCustomer(input: z.infer<typeof ManualCustomerI
                     generationHistory: [], // Ensure this field exists
                     team: creatorTeam || existingDoc.data().team || null, // Prioritize new team, then existing, then null
                 });
+                revalidateTag(CUSTOMERS_CACHE_TAG);
                 return { success: true, customerId: existingDoc.id, status: 'updated' };
             }
         }
@@ -246,6 +249,7 @@ export async function createManualCustomer(input: z.infer<typeof ManualCustomerI
         });
 
         console.log(`[Action: createManualCustomer] >>> SUKSES! New customer created with ID: ${newCustomerDoc.id}`);
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true, customerId: newCustomerDoc.id, status: 'created' };
 
     } catch (error) {
@@ -317,6 +321,7 @@ export async function assignSalesToEntity(entityId: string, salesId: string, sal
         }
 
         console.log(`[Action: assignSalesToEntity] >>> SUKSES!`);
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true };
     } catch (error) {
         console.error('[Action: assignSalesToEntity] !!! ERROR !!!', error);
@@ -531,6 +536,7 @@ export async function updateCustomer(input: z.infer<typeof UpdateCustomerInputSc
         const customerRef = adminDb.collection('customers').doc(customerId);
         await customerRef.update(customerUpdateData);
         console.log(`[Action: updateCustomer] >>> SUKSES! Pelanggan ${customerId} diperbarui.`);
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true };
     } catch (error) {
         console.error('[Action: updateCustomer] !!! ERROR !!!', error);
@@ -685,6 +691,7 @@ export async function createBulkCustomers(
         await Promise.all(batches.map(batch => batch.commit()));
 
         console.log(`[Action: createBulkCustomers] >>> SUKSES! Dibuat: ${createdCount}, Diperbarui: ${updatedCount}, Dilewati: ${skippedCount}.`);
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true, created: createdCount, updated: updatedCount, skipped: skippedCount };
 
     } catch (error) {
@@ -707,6 +714,7 @@ export async function deleteCustomer(customerId: string): Promise<{ success: boo
         await customerRef.delete();
 
         console.log(`[Action: deleteCustomer] >>> SUKSES! Pelanggan ${customerId} berhasil dihapus.`);
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true };
     } catch (error) {
         console.error("[Action: deleteCustomer] !!! ERROR !!!", error);
@@ -763,6 +771,7 @@ export async function assignToSalesAndAddNote(
         }
 
         console.log(`[Action: assignToSalesAndAddNote] >>> SUKSES!`);
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true };
     } catch (error) {
         console.error('[Action: assignToSalesAndAddNote] !!! ERROR !!!', error);

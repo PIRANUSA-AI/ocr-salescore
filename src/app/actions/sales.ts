@@ -14,7 +14,9 @@ import { generateCommunicationForCustomer, type CommunicationGenerationInput } f
 import { getFollowUpTasks, getOpportunityTasksFromDb } from './leader';
 import { logActivity } from './activity';
 import { getCustomers } from './customer';
+import { CUSTOMERS_CACHE_TAG } from '@/lib/cache-tags';
 import { createNotification } from './notification';
+import { revalidateTag } from 'next/cache';
 
 
 // -------- ZOD SCHEMAS --------
@@ -209,6 +211,7 @@ export async function updatePipelineStatus(input: z.infer<typeof updatePipelineS
             }
         }
 
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true };
     } catch (error) {
         console.error('[Action: updatePipelineStatus] !!! ERROR !!!', error);
@@ -261,6 +264,7 @@ export async function updateCustomerDetails(input: z.infer<typeof updateCustomer
     try {
         await customerRef.update(updateData);
         console.log(`[Action: updateCustomerDetails] >>> SUKSES!`);
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true };
     } catch (error) {
         console.error('[Action: updateCustomerDetails] !!! ERROR !!!', error);
@@ -307,6 +311,7 @@ export async function addGenerationToHistory(input: z.infer<typeof addGeneration
             targetName: customerName,
         });
 
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true };
     } catch (error) {
         console.error('[Action: addGenerationToHistory] !!! ERROR !!!', error);

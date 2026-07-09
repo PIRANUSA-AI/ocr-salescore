@@ -143,10 +143,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setIsAiTaskLoading(true);
     try {
       const opportunityTasks = await runAndSaveAiOpportunityTasks();
-      const salesTeamForFilter = salesTeam.length > 0 ? salesTeam : (await getSalesUsers().then(users => users.filter(u => u.team === userProfile.team)));
-      const teamSalesIds = salesTeamForFilter.map(s => s.uid);
-      const customersForFilter = customers.length > 0 ? customers : (await getAllCustomers().then(allCustomers => allCustomers.filter(c => !c.assignedSalesId || teamSalesIds.includes(c.assignedSalesId!))));
-      const customerIdsOfTeam = new Set(customersForFilter.map(c => c.id));
+      // salesTeam/customers are already role-scoped by fetchFastData; no need
+      // to re-fetch getSalesUsers/getAllCustomers here.
+      const customerIdsOfTeam = new Set(customers.map(c => c.id));
       const filteredOpportunityTasks = opportunityTasks.filter(t => customerIdsOfTeam.has(t.customerId));
       setTasks(prev => ({ ...prev, opportunity: filteredOpportunityTasks }));
       toast({ title: 'Analisis AI Selesai', description: 'Tugas peluang baru telah dibuat berdasarkan data pelanggan terakhir.' });

@@ -51,7 +51,8 @@ export function OcrReportExport({ ocrData, periodeLabel, timLabel, excelTeam }: 
       doc.text('Ringkasan', 14, 40);
       const statsBody = [
         ['Total Leads OCR', ocrData.stats.totalOcr.toString()],
-        ['Baru Hari Ini', ocrData.stats.newToday.toString()],
+        ['Baru Masuk Hari Ini', ocrData.stats.newToday.toString()],
+        ['Dikerjakan Hari Ini', ocrData.stats.activeToday.toString()],
         ['Belum Di-assign', ocrData.stats.unassigned.toString()],
         ['Won', ocrData.stats.won.toString()],
         ['Conversion Rate', `${ocrData.stats.conversionRate.toFixed(1)}%`],
@@ -74,14 +75,14 @@ export function OcrReportExport({ ocrData, periodeLabel, timLabel, excelTeam }: 
       const salesBody = ocrData.perSales.map((r) => [
         r.salesName,
         r.total.toString(),
-        r.newToday.toString(),
+        r.activeToday.toString(),
         r.won.toString(),
         `${r.conversionRate.toFixed(0)}%`,
         currency(r.potentialRevenue),
       ]);
       autoTable(doc, {
         startY: y + 3,
-        head: [['Sales', 'Total', 'Baru Hr Ini', 'Won', 'Konversi', 'Potensi Revenue']],
+        head: [['Sales', 'Total', 'Aktif Hr Ini', 'Won', 'Konversi', 'Potensi Revenue']],
         body: salesBody,
         theme: 'grid',
         headStyles: { fillColor: [142, 68, 173], fontSize: 8 },

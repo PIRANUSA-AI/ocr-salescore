@@ -2,7 +2,8 @@
 
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { USERS_CACHE_TAG } from '@/lib/cache-tags';
 
 const updateProfileSchema = z.object({
     uid: z.string(),
@@ -47,6 +48,7 @@ export async function updateProfileAction(data: z.infer<typeof updateProfileSche
         });
 
         revalidatePath('/dashboard/profile');
+        revalidateTag(USERS_CACHE_TAG);
         return { success: true, message: 'Profil berhasil diperbarui.' };
 
     } catch (error: any) {

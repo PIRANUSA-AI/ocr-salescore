@@ -1,14 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import {
-  getOcrReportData,
-  type OcrReportData,
-  type OcrTimeRange,
-  type OcrTeamFilter,
-} from '@/app/actions/report';
-import { Loader2, ScanLine, Zap, UserX, Trophy } from 'lucide-react';
+import { getOcrCustomers } from '@/app/actions/report';
+import { computeOcrReport, type OcrTimeRange, type OcrTeamFilter } from '@/lib/ocr-report';
+import type { Customer } from '@/types';
+import { Loader2, ScanLine, Zap, UserX, Trophy, UserPlus } from 'lucide-react';
 import { MetricCard } from '@/components/ui/metric-card';
 import { PageHeader } from '@/components/ui/page-header';
 import { OcrSalesRanking } from './ocr-sales-ranking';
@@ -48,24 +45,35 @@ export default function ReportPage() {
   const isSuperadmin = userProfile?.role === 'Superadmin';
   const [ocrRange, setOcrRange] = useState<OcrTimeRange>('30d');
   const [ocrTeam, setOcrTeam] = useState<OcrTeamFilter>('all');
-  const [ocrData, setOcrData] = useState<OcrReportData | null>(null);
+  const [ocrCustomers, setOcrCustomers] = useState<Customer[] | null>(null);
   const [ocrLoading, setOcrLoading] = useState(true);
+  const [ocrError, setOcrError] = useState<string | null>(null);
 
+  // Fetch OCR customers once per user; range/team filters are applied
+  // client-side below so switching them doesn't re-hit Firestore.
   useEffect(() => {
     if (!userProfile) return;
     setOcrLoading(true);
-    getOcrReportData(userProfile, ocrRange, ocrTeam)
-      .then(setOcrData)
+    getOcrCustomers(userProfile)
+      .then((data) => {
+        setOcrCustomers(data);
+        setOcrError(null);
+      })
       .catch((err) => {
         console.error('[OCR Report]', err);
-        setOcrData(null);
+        setOcrError((err as Error).message || 'Gagal memuat data laporan.');
       })
       .finally(() => setOcrLoading(false));
-  }, [userProfile, ocrRange, ocrTeam]);
+  }, [userProfile]);
+
+  const ocrData = useMemo(() => {
+    if (!ocrCustomers) return null;
+    return computeOcrReport(ocrCustomers, ocrRange, ocrTeam);
+  }, [ocrCustomers, ocrRange, ocrTeam]);
 
   if (ocrLoading && !ocrData) return <Skeleton />;
   if (!ocrData) {
-    return <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">Gagal memuat data laporan.</div>;
+    return <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">{ocrError || 'Gagal memuat data laporan.'}</div>;
   }
 
   // Label & param untuk export
@@ -119,15 +127,20 @@ export default function ReportPage() {
       </div>
 
       {/* OCR KPI */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <MetricCard
           title="Total Leads OCR"
           value={ocrData.stats.totalOcr.toLocaleString('id-ID')}
           icon={<ScanLine className="h-4 w-4" />}
         />
         <MetricCard
-          title="Baru Hari Ini"
+          title="Baru Masuk Hari Ini"
           value={ocrData.stats.newToday.toLocaleString('id-ID')}
+          icon={<UserPlus className="h-4 w-4" />}
+        />
+        <MetricCard
+          title="Dikerjakan Hari Ini"
+          value={ocrData.stats.activeToday.toLocaleString('id-ID')}
           icon={<Zap className="h-4 w-4" />}
         />
         <MetricCard

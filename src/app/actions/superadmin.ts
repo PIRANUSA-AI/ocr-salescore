@@ -2,6 +2,8 @@
 
 import { adminDb, adminAuth } from '@/lib/firebase-admin';
 import type { FeatureFlag, UserProfile } from '@/types';
+import { revalidateTag } from 'next/cache';
+import { USERS_CACHE_TAG } from '@/lib/cache-tags';
 
 const defaultFlags: FeatureFlag[] = [
     { id: 'webinar', name: 'Tugas Webinar Baru', description: 'Tugas follow-up untuk prospek yang baru ikut webinar.', isEnabled: true },
@@ -100,6 +102,7 @@ export async function createUser(data: CreateUserInput): Promise<{ success: bool
         await adminDb.collection('users').doc(userRecord.uid).set(newUserProfile);
 
         console.log("[Action: createUser] SUCCESS. UID:", userRecord.uid);
+        revalidateTag(USERS_CACHE_TAG);
         return { success: true, uid: userRecord.uid };
     } catch (error: any) {
         console.error("[Action: createUser] Error:", error);
@@ -130,6 +133,7 @@ export async function updateUser(data: UpdateUserInput): Promise<{ success: bool
         });
 
         console.log("[Action: updateUser] SUCCESS.");
+        revalidateTag(USERS_CACHE_TAG);
         return { success: true };
     } catch (error: any) {
         console.error("[Action: updateUser] Error:", error);
@@ -147,6 +151,7 @@ export async function deleteUser(uid: string): Promise<{ success: boolean }> {
         await adminDb.collection('users').doc(uid).delete();
 
         console.log("[Action: deleteUser] SUCCESS.");
+        revalidateTag(USERS_CACHE_TAG);
         return { success: true };
     } catch (error: any) {
         console.error("[Action: deleteUser] Error:", error);

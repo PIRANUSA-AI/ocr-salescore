@@ -23,6 +23,8 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { ProspectData } from '@/types';
 import crypto from 'crypto';
 import Papa from 'papaparse';
+import { revalidateTag } from 'next/cache';
+import { CUSTOMERS_CACHE_TAG } from '@/lib/cache-tags';
 
 
 // -------- ZOD SCHEMAS --------
@@ -358,9 +360,10 @@ export async function assignProspects(input: z.infer<typeof assignProspectsSchem
         
         // Commit the batch for creating new customers
         await customerCreationBatch.commit();
-        
+
         console.log(`[Action: assignProspects] >>> SUKSES! ${prospectsToAssign.length} pelanggan baru berhasil dibuat dan status penugasan diperbarui.`);
-        
+
+        revalidateTag(CUSTOMERS_CACHE_TAG);
         return { success: true, count: prospectsToAssign.length };
 
     } catch (error) {
