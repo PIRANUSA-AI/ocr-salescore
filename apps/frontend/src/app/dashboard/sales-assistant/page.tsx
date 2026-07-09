@@ -29,8 +29,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { formatDistanceToNow } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { addGenerationToHistory } from '@/app/actions/sales';
-import { getSalesUsers } from '@/app/actions/user';
-import { getCustomers } from '@/app/actions/customer';
+import { api } from '@/lib/api-client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -60,9 +59,9 @@ const CustomerHistory = () => {
 
     const fetchHistory = useCallback(() => {
         setIsLoading(true);
-        getCustomers()
-            .then(allCustomers => {
-                const assistantCustomers = allCustomers.filter(c =>
+        api.customers.list()
+            .then(r => {
+                const assistantCustomers = r.customers.filter(c =>
                     c.acquisitionContext?.source === 'Reply Assistant' && c.generationHistory && c.generationHistory.length > 0
                 );
                 setHistoryCustomers(assistantCustomers);
@@ -160,8 +159,8 @@ export default function SalesAssistantPage() {
     const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
 
     useEffect(() => {
-        getSalesUsers().then(setSalesTeam);
-        getCustomers().then(setAllCustomers);
+        api.users.list({ role: 'Sales' }).then(r => setSalesTeam(r.users));
+        api.customers.list().then(r => setAllCustomers(r.customers));
     }, []);
 
     const handleRecommendationChange = (index: number, value: string) => {
@@ -317,7 +316,7 @@ export default function SalesAssistantPage() {
             });
 
             // Refresh customer list to include new/updated one
-            getCustomers().then(setAllCustomers);
+            api.customers.list().then(r => setAllCustomers(r.customers));
 
         } catch (e: any) {
             setError(e.message || 'Terjadi kesalahan saat mengambil rekomendasi.');
