@@ -15,7 +15,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { compressImageToDataUri } from '@/lib/image-compress';
 import { api } from '@/lib/api-client';
-import { extractCustomerVision } from '@/ai/flows/extract-customer-vision';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { ExtractResult } from '@/lib/ocr/extract';
@@ -209,22 +208,15 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const processImage = useCallback(async (dataUri: string) => {
     if (!userProfile?.uid) return;
     const compressed = await compressImageToDataUri(dataUri);
-    const tempId = `ocr-${Date.now()}`;
 
-    setPreviews(prev => ({ ...prev, [tempId]: dataUri }));
-    setActiveJobId(tempId);
+    setPreviews(prev => ({ ...prev, [dataUri]: dataUri }));
     resetForm();
 
     try {
-      const result = await extractCustomerVision({ imageDataUri: compressed });
-      if ('rejected' in result) {
-        toast({ variant: 'destructive', title: 'Gambar Ditolak', description: result.visibleSummary || result.message });
-        return;
-      }
-      setJobs(prev => [{
-        id: tempId, userId: userProfile.uid, status: 'done', imageUrl: result.imageUrl || '',
-        result: result as any, createdAt: '', updatedAt: '',
-      }, ...prev]);
+      const { job } = await api.ocr.process(compressed);
+      setActiveJobId(job.id);
+      // refresh job list
+      api.ocr.listJobs(20).then(r => setJobs(r.jobs as OcrJobData[])).catch(() => {});
     } catch (err: any) {
       console.error('[OCR] process error:', err);
       toast({ variant: 'destructive', title: 'OCR Gagal', description: err.message });

@@ -1,67 +1,43 @@
 /**
  * OCR processing service — runs the full extraction pipeline on the backend.
- * Steps: preflight → upload to R2 → AI extraction → slice-rescan → save result.
  */
 import { ocrJobRepo } from '../repositories/ocr-jobs.js';
 import { uploadOcrImage } from '../lib/r2.js';
-import { getRedis } from '../lib/redis.js';
 import type { OcrJob } from '../repositories/ocr-jobs.js';
 
-const QUEUE_KEY = 'ocr:queue';
-const RESULT_CHANNEL = 'ocr:result';
-
 /**
- * Creates a job record, pushes to Redis queue, and returns immediately.
- * The worker (processNextJob) picks it up asynchronously.
+ * Proses OCR synchronously — langsung preflight, upload R2, AI extraction, slice-rescan.
+ * Gak pake Redis queue. Cocok buat VPS single-server.
  */
-export async function submitOcrJob(
+export async function processOcrSync(
   userId: string,
   imageDataUri: string,
 ): Promise<OcrJob> {
+  // buat job record
   const job = await ocrJobRepo.create({ userId });
-
-  // Push to Redis queue for async processing
-  await getRedis().rpush(QUEUE_KEY, JSON.stringify({ jobId: job.id, imageDataUri, userId }));
-  console.log(`[ocr] Job ${job.id} queued for user ${userId}`);
-
-  // Kick off processing inline (since we're single-server)
-  processNextJob().catch(err => console.error('[ocr] worker error:', err));
-
-  return job;
-}
-
-/**
- * Pops one job from the Redis queue, runs the full OCR pipeline,
- * updates the job record in Postgres, and publishes completion.
- */
-async function processNextJob(): Promise<void> {
-  const raw = await getRedis().lpop(QUEUE_KEY);
-  if (!raw) return;
-
-  const { jobId, imageDataUri, userId } = JSON.parse(raw);
-  console.log(`[ocr] Processing job ${jobId}...`);
+  const jobId = job.id;
 
   try {
     await ocrJobRepo.updateStatus(jobId, 'processing');
 
-    // ─── Step 1: Preflight ──────────────────────────────
+    // Step 1: preflight
     const { assertRelevantOcrImage } = await import('../lib/ocr/preflight.js');
     const preflight = await assertRelevantOcrImage(imageDataUri);
-    console.log(`[ocr] Preflight OK (${preflight.confidence})`);
+    console.log(`[ocr] preflight ok (${preflight.confidence})`);
 
-    // ─── Step 2: Upload to R2 ────────────────────────────
+    // Step 2: upload ke R2
     const { key, url: imageUrl } = await uploadOcrImage(imageDataUri);
-    console.log(`[ocr] R2 upload OK → ${key}`);
+    console.log(`[ocr] r2 upload ok -> ${key}`);
     await ocrJobRepo.updateStatus(jobId, 'processing', { imageUrl });
 
-    // ─── Step 3: AI extraction ───────────────────────────
+    // Step 3: AI extraction
     const { extractCustomer } = await import('../lib/ocr/extract.js');
     const result = await extractCustomer(imageUrl, { alwaysSecondOpinion: false });
     result.imageUrl = imageUrl;
 
-    // ─── Step 4: Slice-rescan if no form answers ────────
+    // Step 4: slice-rescan kalo form answers kosong
     if (!result.formAnswers || result.formAnswers.length === 0) {
-      console.log('[ocr] No form answers, trying slice scan...');
+      console.log('[ocr] no form answers, slicing...');
       try {
         const { sliceImage } = await import('../lib/ocr/image-slicer.js');
         const { callOpenAI } = await import('../lib/openai-client.js');
@@ -91,21 +67,21 @@ async function processNextJob(): Promise<void> {
               const k = fa.question.toLowerCase().trim();
               if (fa.answer && !seen.has(k)) { seen.add(k); allAnswers.push(fa); }
             }
-          } catch { /* skip failed slice */ }
+          } catch { /* skip */ }
         }
         if (allAnswers.length > 0) result.formAnswers = allAnswers;
-      } catch { /* slice scan failed, continue */ }
+      } catch { /* slice scan failed */ }
     }
 
-    // ─── Step 5: Save result ─────────────────────────────
+    // Step 5: save result
     await ocrJobRepo.updateStatus(jobId, 'done', { result, imageUrl });
-    console.log(`[ocr] Job ${jobId} done in ${result.elapsedMs}ms`);
+    console.log(`[ocr] job ${jobId} done in ${result.elapsedMs}ms`);
 
-    // Publish to Redis for real-time subscribers
-    await getRedis().publish(RESULT_CHANNEL, JSON.stringify({ jobId, status: 'done', userId }));
+    // return fresh job
+    return (await ocrJobRepo.findById(jobId))!;
   } catch (err: any) {
-    console.error(`[ocr] Job ${jobId} failed:`, err.message);
+    console.error(`[ocr] job ${jobId} failed:`, err.message);
     await ocrJobRepo.updateStatus(jobId, 'error', { errorMessage: err.message });
-    await getRedis().publish(RESULT_CHANNEL, JSON.stringify({ jobId, status: 'error', userId }));
+    return (await ocrJobRepo.findById(jobId))!;
   }
 }

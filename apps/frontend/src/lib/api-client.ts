@@ -93,6 +93,9 @@ export const api = {
     createJob(imageUrl?: string) {
       return request<{ job: any }>('POST', '/ocr/jobs', { imageUrl });
     },
+    process(imageDataUri: string) {
+      return request<{ job: any }>('POST', '/ocr/process', { imageDataUri });
+    },
     listJobs(limit = 10) {
       return request<{ jobs: any[] }>('GET', `/ocr/jobs?limit=${limit}`);
     },
