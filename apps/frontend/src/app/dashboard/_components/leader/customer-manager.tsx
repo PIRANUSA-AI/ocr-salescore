@@ -19,8 +19,7 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { EmailClientDialog } from '../email-client-dialog';
-import { updatePipelineStatus } from '@/app/actions/sales';
-import { updateCustomerPriority } from '@/app/actions/customer';
+import { api } from '@/lib/api-client';
 import { FadeIn } from '@/components/ui/fade-in';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -177,7 +176,8 @@ export const CustomerManager = () => {
     const handleUpdatePipelineStatus = useCallback(async (customerId: string, customerName: string, newStatus: PipelineStatus) => {
         if (!userProfile) return;
         try {
-            await updatePipelineStatus({ customerId, customerName, newStatus, actorId: userProfile.uid, actorName: userProfile.name });
+            await api.customers.update(customerId, { pipelineStatus: newStatus });
+            await api.activities.create({ action: `mengubah status pipeline ${customerName} menjadi ${newStatus}`, targetId: customerId, targetName: customerName });
             refreshAllData();
         } catch (error) {
             toast({ variant: 'destructive', title: 'Gagal', description: (error as Error).message });
@@ -186,7 +186,7 @@ export const CustomerManager = () => {
 
     const handleUpdatePriority = useCallback(async (customerId: string, newPriority: 'High' | 'Medium' | 'Low' | 'none') => {
         try {
-            await updateCustomerPriority({ customerId, newPriority });
+            await api.customers.updatePriority(customerId, newPriority);
             refreshAllData();
         } catch (error) {
             toast({ variant: 'destructive', title: 'Gagal', description: (error as Error).message });

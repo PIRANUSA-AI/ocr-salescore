@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { updateProfileAction, changePasswordAction } from '@/app/actions/profile';
+import { api } from '@/lib/api-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Camera, User, Lock, Save, ArrowLeft } from 'lucide-react';
-import { uploadImageToR2 } from '@/app/actions/storage';
 
 export default function ProfilePage() {
     const { userProfile } = useAuth();
@@ -46,7 +45,8 @@ export default function ProfilePage() {
                 reader.onerror = () => reject(new Error('Gagal membaca file.'));
                 reader.readAsDataURL(file);
             });
-            const { url } = await uploadImageToR2(dataUri, `profile_pictures/${userProfile.uid}`);
+            const { mediaAsset } = await api.media.upload({ dataUri, assetName: `profile_${userProfile.uid}` });
+            const url = mediaAsset.imageUrl;
 
             setPhotoURL(url);
             toast({ title: "Foto Diunggah", description: "Jangan lupa simpan perubahan profil Anda." });
@@ -62,18 +62,9 @@ export default function ProfilePage() {
         if (!userProfile) return;
         setIsLoading(true);
         try {
-            const result = await updateProfileAction({
-                uid: userProfile.uid,
-                name,
-                team: team as 'AEC' | 'MFG',
-                photoURL
-            });
+            await api.auth.updateProfile({ name, photoURL });
 
-            if (result.success) {
-                toast({ title: "Sukses", description: "Profil berhasil diperbarui." });
-            } else {
-                toast({ variant: "destructive", title: "Gagal", description: result.error });
-            }
+            toast({ title: "Sukses", description: "Profil berhasil diperbarui." });
         } catch (error) {
             toast({ variant: "destructive", title: "Error", description: "Terjadi kesalahan sistem." });
         } finally {
@@ -94,18 +85,11 @@ export default function ProfilePage() {
 
         setIsLoading(true);
         try {
-            const result = await changePasswordAction({
-                uid: userProfile.uid,
-                newPassword
-            });
+            await api.auth.updatePassword(newPassword);
 
-            if (result.success) {
-                toast({ title: "Sukses", description: "Password berhasil diubah. Silakan login ulang nanti." });
-                setNewPassword('');
-                setConfirmPassword('');
-            } else {
-                toast({ variant: "destructive", title: "Gagal", description: result.error });
-            }
+            toast({ title: "Sukses", description: "Password berhasil diubah. Silakan login ulang nanti." });
+            setNewPassword('');
+            setConfirmPassword('');
         } catch (error) {
             toast({ variant: "destructive", title: "Error", description: "Terjadi kesalahan sistem." });
         } finally {

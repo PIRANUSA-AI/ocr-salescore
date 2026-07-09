@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 9003",
-    "build": "next build",
+    "build": "next build && node -e \"const fs=require('fs');const s='.next/standalone/apps/frontend';const d=s+'/.next/static';if(!fs.existsSync(d)){fs.cpSync('.next/static',d,{recursive:true});}const p=s+'/public';if(!fs.existsSync(p)){fs.cpSync('public',p,{recursive:true});}console.log('Copied static+public to standalone');\"",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"

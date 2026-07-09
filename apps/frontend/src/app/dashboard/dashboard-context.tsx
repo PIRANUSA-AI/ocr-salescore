@@ -3,11 +3,9 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import { type Customer, type UserProfile, type FollowUpTasks, type AnalysisHistoryEntry, ProspectData, ActivityLog, WebinarAnalysisOutput, PipelineStatus } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { getAllCustomers, getFollowUpTasks, runAndSaveAiOpportunityTasks, getOpportunityTasksFromDb, assignSalesToEntity, updateCustomer, createManualCustomer, deleteCustomer } from '@/app/actions/leader';
-import { getAssignedCustomers } from '@/app/actions/sales';
-import { getSalesUsers } from '@/app/actions/user';
+import { api } from '@/lib/api-client';
+import { runAndSaveAiOpportunityTasks, getFollowUpTasks, getOpportunityTasksFromDb, assignSalesToEntity } from '@/app/actions/leader';
 import { getAnalysisHistory, deleteAnalysis, assignProspects, analyzeWebinar, generateTopicRecommendationsForAnalysis, generateWebinarInsights } from '@/app/actions/analyze';
-import { getActivityLogs } from '@/app/actions/activity';
 import type { WebinarAnalysisInput, WebinarAnalysisResult } from '@/app/actions/analyze';
 import { endOfDay, startOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
@@ -77,25 +75,19 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
     try {
-      const salesTeamPromise = getSalesUsers().then(users =>
-        users.filter(u => userProfile.role !== 'Leader' || u.team === userProfile.team)
+      const salesTeamPromise = api.users.listSales(userProfile.team).then(r =>
+        r.users.map(u => ({ ...u, id: u.uid }))
       );
 
-      const [salesData] = await Promise.all([salesTeamPromise]);
-      const formattedSales = salesData.map(s => ({ ...s, id: s.uid }));
+      const [formattedSales] = await Promise.all([salesTeamPromise]);
       setSalesTeam(formattedSales);
 
       const customersPromise =
           userProfile.role === 'Superadmin'
-            ? getAllCustomers()
+            ? api.customers.list().then(r => r.customers)
             : userProfile.role === 'Leader'
-            ? getAllCustomers().then(allCustomers => allCustomers.filter(c => {
-              const isTeamMatch = c.team === userProfile.team;
-              const teamSalesIds = formattedSales.map(s => s.id);
-              const isAssignedToTeam = c.assignedSalesId && teamSalesIds.includes(c.assignedSalesId);
-              return isTeamMatch || isAssignedToTeam;
-            }))
-            : getAssignedCustomers(user.uid);
+            ? api.customers.list({ team: userProfile.team }).then(r => r.customers)
+            : api.customers.list({ assignedSalesId: user.uid }).then(r => r.customers);
 
       const [customersData] = await Promise.all([customersPromise]);
       setCustomers(customersData);
@@ -111,8 +103,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         allOppTasks.filter(t => customerIdsOfTeam.has(t.customerId))
       );
 
-      const historyDataPromise = getAnalysisHistory(user.uid);
-      const logsDataPromise = getActivityLogs(30);
+      const historyDataPromise = api.analyses.list().then(r => r.analyses);
+      const logsDataPromise = api.activities.list(30).then(r => r.activities);
 
       const [tasksResult, opportunityResult, historyResult, logsResult] = await Promise.allSettled([
         tasksDataPromise,
@@ -143,9 +135,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setIsAiTaskLoading(true);
     try {
       const opportunityTasks = await runAndSaveAiOpportunityTasks();
-      const salesTeamForFilter = salesTeam.length > 0 ? salesTeam : (await getSalesUsers().then(users => users.filter(u => u.team === userProfile.team)));
-      const teamSalesIds = salesTeamForFilter.map(s => s.uid);
-      const customersForFilter = customers.length > 0 ? customers : (await getAllCustomers().then(allCustomers => allCustomers.filter(c => !c.assignedSalesId || teamSalesIds.includes(c.assignedSalesId!))));
+      const salesTeamForFilter = salesTeam.length > 0 ? salesTeam : (await api.users.list({ role: 'Sales', team: userProfile.team }).then(r => r.users.map(u => ({ ...u, id: u.uid }))));
+      const teamSalesIds = salesTeamForFilter.map(s => s.id);
+      const customersForFilter = customers.length > 0 ? customers : (await api.customers.list({ team: userProfile.team }).then(r => r.customers.filter(c => !c.assignedSalesId || teamSalesIds.includes(c.assignedSalesId!))));
       const customerIdsOfTeam = new Set(customersForFilter.map(c => c.id));
       const filteredOpportunityTasks = opportunityTasks.filter(t => customerIdsOfTeam.has(t.customerId));
       setTasks(prev => ({ ...prev, opportunity: filteredOpportunityTasks }));
@@ -181,7 +173,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
 
   const handleAssignSalesToEntity = async (entityId: string, salesId: string, salesName: string, entityType: 'customer' | 'task') => {
     try {
-      await assignSalesToEntity(entityId, salesId, salesName, entityType);
+      if (entityType === 'customer') {
+        await api.customers.update(entityId, { assignedSalesId: salesId, assignedSalesName: salesName });
+      }
       toast({ title: 'Sukses', description: `Tugas/Pelanggan telah ditugaskan kepada ${salesName || 'Tidak Ditugaskan'}.` });
       refreshAllData();
     } catch (error) {
@@ -297,7 +291,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     try {
-      await updateCustomer({ ...customerData, creatorTeam: userProfile.team });
+      await api.customers.update(customerData.id || customerData.customerId, customerData);
       toast({ title: 'Sukses', description: `Pelanggan "${customerData.name}" berhasil diperbarui.` });
       refreshAllData();
       closeCustomerEditDialog();
@@ -313,7 +307,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     try {
-      await createManualCustomer({ ...customerData, creatorTeam: userProfile.team });
+      await api.customers.create(customerData);
       toast({ title: 'Sukses', description: `Pelanggan "${customerData.name}" berhasil ditambahkan.` });
       refreshAllData();
       closeCustomerEditDialog();
@@ -325,7 +319,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
 
   const handleBulkDelete = async (customerIds: string[]) => {
     try {
-      await Promise.all(customerIds.map(id => deleteCustomer(id)));
+      await Promise.all(customerIds.map(id => api.customers.delete(id)));
       toast({ title: 'Sukses', description: `${customerIds.length} pelanggan berhasil dihapus.` });
       refreshAllData();
     } catch (error) {
@@ -345,7 +339,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     try {
-      await Promise.all(customerIds.map(id => assignSalesToEntity(id, newSalesId, sales.name, 'customer')));
+      await Promise.all(customerIds.map(id => api.customers.update(id, { assignedSalesId: newSalesId, assignedSalesName: sales.name })));
       toast({ title: 'Sukses', description: `${customerIds.length} deal berhasil ditugaskan ke ${sales.name}.` });
       refreshAllData();
     } catch (error) {

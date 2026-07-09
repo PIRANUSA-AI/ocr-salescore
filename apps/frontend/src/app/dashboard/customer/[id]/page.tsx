@@ -9,7 +9,7 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/hooks/use-auth';
-import { getCustomerById } from '@/app/actions/customer';
+import { api } from '@/lib/api-client';
 import type { Customer, PipelineStatus, ProductName, GenerationHistoryItem, FormAnswer } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,7 +32,7 @@ import {
     Smartphone,
     ClipboardList,
 } from 'lucide-react';
-import { updateCustomerDetails, updatePipelineStatus } from '@/app/actions/sales';
+
 import { format, parseISO, isValid, formatDistanceToNow } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -142,7 +142,7 @@ export default function CustomerDetailPage() {
         if (!customer) setIsLoading(true);
 
         try {
-            const data = await getCustomerById(customerId);
+            const { customer: data } = await api.customers.get(customerId) as { customer: Customer };
             if (data) {
                 setCustomer(data);
                 form.reset({
@@ -190,8 +190,7 @@ export default function CustomerDetailPage() {
                 quantity: p.quantity
             }));
 
-            await updateCustomerDetails({
-                customerId: customer.id,
+            await api.customers.update(customer.id, {
                 name: data.name,
                 company: data.company,
                 jobTitle: data.jobTitle,
@@ -199,7 +198,6 @@ export default function CustomerDetailPage() {
                 phone: data.phone,
                 potentialRevenue: data.potentialRevenue,
                 products: productsPayload,
-                notes: newNote.trim() ? newNote.trim() : undefined,
                 formAnswers: data.formAnswers,
                 address: data.address,
             });
@@ -222,13 +220,8 @@ export default function CustomerDetailPage() {
         setCustomer(prev => prev ? { ...prev, pipelineStatus: newStatus } : null);
 
         try {
-            await updatePipelineStatus({
-                customerId,
-                customerName: customer.name,
-                newStatus,
-                actorId: userProfile.uid,
-                actorName: userProfile.name,
-            });
+            await api.customers.update(customerId, { pipelineStatus: newStatus });
+            await api.activities.create({ action: `mengubah status pipeline ${customer.name} menjadi ${newStatus}`, targetId: customerId, targetName: customer.name });
             toast({ title: 'Status diperbarui', description: `Status menjadi ${newStatus}.` });
         } catch (err) {
             setCustomer(prev => prev ? { ...prev, pipelineStatus: originalStatus } : null);

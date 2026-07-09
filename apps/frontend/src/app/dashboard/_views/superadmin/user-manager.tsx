@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { FadeIn } from "@/components/ui/fade-in";
-import { getUsers, createUser, updateUser, deleteUser, resetUserPassword, type CreateUserInput, type UpdateUserInput } from '@/app/actions/superadmin';
+import { api } from '@/lib/api-client';
 import type { UserProfile } from '@/types';
 
 export function UserManager() {
@@ -29,7 +29,7 @@ export function UserManager() {
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
     // Form States
-    const [formData, setFormData] = useState<CreateUserInput>({
+    const [formData, setFormData] = useState<{ name: string; email: string; password: string; role: string; team: string }>({
         name: '',
         email: '',
         password: '',
@@ -46,7 +46,7 @@ export function UserManager() {
     const loadUsers = async () => {
         setIsLoading(true);
         try {
-            const data = await getUsers();
+            const data = await api.users.list().then(r => r.users);
             setUsers(data);
         } catch (error) {
             toast({
@@ -67,7 +67,7 @@ export function UserManager() {
 
         setIsActionLoading(true);
         try {
-            await createUser(formData);
+            await api.users.create(formData);
             toast({ title: "Sukses", description: "Pengguna berhasil dibuat." });
             setIsCreateOpen(false);
             setFormData({ name: '', email: '', password: '', role: 'Sales', team: 'AEC' }); // Reset
@@ -84,7 +84,7 @@ export function UserManager() {
 
         setIsActionLoading(true);
         try {
-            await updateUser({
+            await api.users.update(selectedUser.uid, {
                 uid: selectedUser.uid,
                 name: formData.name,
                 role: formData.role,
@@ -105,7 +105,7 @@ export function UserManager() {
 
         setIsActionLoading(true);
         try {
-            await deleteUser(user.uid);
+            await api.users.delete(user.uid);
             toast({ title: "Sukses", description: "Pengguna dihapus." });
             loadUsers();
         } catch (error: any) {
@@ -119,7 +119,7 @@ export function UserManager() {
         if (!selectedUser || !passwordData) return;
         setIsActionLoading(true);
         try {
-            await resetUserPassword(selectedUser.uid, passwordData);
+            await api.users.updatePassword(selectedUser.uid, passwordData);
             toast({ title: "Sukses", description: "Password berhasil di-reset." });
             setIsPasswordOpen(false);
             setPasswordData('');

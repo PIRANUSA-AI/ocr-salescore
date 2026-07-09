@@ -26,7 +26,7 @@ firebase-debug.log
 thumbs.db
 .agents
 AGENTS.md
-
+*.mjs
 # Log & artifacts (jangan di-commit)
 *.log
 salescore-dev.log

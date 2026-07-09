@@ -14,7 +14,7 @@ import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { FadeIn } from '@/components/ui/fade-in';
-import { renameCompany, deleteCompanyGroup } from '@/app/actions/customer';
+import { api } from '@/lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 import {
     Dialog,
@@ -98,7 +98,7 @@ export default function CompanyView() {
         if (!editCompany) return;
         setIsActionLoading(true);
         try {
-            await renameCompany(editCompany.oldName, editCompany.newName);
+            await api.customers.renameCompany(editCompany.oldName, editCompany.newName);
             toast({ title: "Berhasil", description: `Perusahaan ${editCompany.oldName} diubah menjadi ${editCompany.newName}` });
             setEditCompany(null);
             router.refresh();
@@ -114,7 +114,7 @@ export default function CompanyView() {
         if (!deleteCompany) return;
         setIsActionLoading(true);
         try {
-            await deleteCompanyGroup(deleteCompany);
+            await api.customers.deleteCompanyGroup(deleteCompany);
             toast({ title: "Berhasil", description: `Perusahaan ${deleteCompany} telah dihapus (di-unlink).` });
             setDeleteCompany(null);
         } catch (error) {

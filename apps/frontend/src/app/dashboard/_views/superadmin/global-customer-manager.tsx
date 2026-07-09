@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { type Customer } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { getAllCustomers } from '@/app/actions/leader';
+import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmailBlastDialog } from '../../_components/leader/email-blast-dialog';
@@ -64,7 +64,7 @@ export const GlobalCustomerManager = () => {
 
     useEffect(() => {
         setIsLoading(true);
-        getAllCustomers()
+        api.customers.list().then(r => r.customers)
             .then(setCustomers)
             .catch(err => {
                 toast({
