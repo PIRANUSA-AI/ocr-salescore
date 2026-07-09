@@ -3,16 +3,27 @@ import { z } from 'zod';
 import { customerRepo } from '../repositories/customers.js';
 import { activityLogRepo } from '../repositories/activity-logs.js';
 import { notificationRepo } from '../repositories/notifications.js';
-import type { SessionPayload } from '../types/index.js';
+import { getPresignedUrl } from '../lib/r2.js';
+import type { SessionPayload, Customer } from '../types/index.js';
 
 const customers = new Hono<{ Variables: { session: SessionPayload | null } }>();
+
+async function refreshImageUrl(c: Customer): Promise<Customer> {
+  if (c.imageKey) {
+    try {
+      c.imageUrl = await getPresignedUrl(c.imageKey, 3600);
+    } catch { /* keep existing/stale imageUrl */ }
+  }
+  return c;
+}
 
 // GET /api/v1/customers
 customers.get('/', async (c) => {
   const team = c.req.query('team') as 'AEC' | 'MFG' | undefined;
   const assignedSalesId = c.req.query('assignedSalesId');
   const list = await customerRepo.findAll({ assignedSalesId, team });
-  return c.json({ customers: list });
+  const withUrls = await Promise.all(list.map(refreshImageUrl));
+  return c.json({ customers: withUrls });
 });
 
 // GET /api/v1/customers/:id
@@ -20,7 +31,7 @@ customers.get('/:id', async (c) => {
   const id = c.req.param('id');
   const customer = await customerRepo.findById(id);
   if (!customer) return c.json({ error: 'Customer not found' }, 404);
-  return c.json({ customer });
+  return c.json({ customer: await refreshImageUrl(customer) });
 });
 
 // POST /api/v1/customers
