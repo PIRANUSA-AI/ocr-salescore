@@ -4,7 +4,7 @@ import { type Customer, type UserProfile, type FollowUpTasks, type AnalysisHisto
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api-client';
-import { runAndSaveAiOpportunityTasks, getFollowUpTasks, getOpportunityTasksFromDb, assignSalesToEntity } from '@/app/actions/leader';
+import { runAndSaveAiOpportunityTasks } from '@/app/actions/leader';
 import { getAnalysisHistory, deleteAnalysis, assignProspects, analyzeWebinar, generateTopicRecommendationsForAnalysis, generateWebinarInsights } from '@/app/actions/analyze';
 import type { WebinarAnalysisInput, WebinarAnalysisResult } from '@/app/actions/analyze';
 import { endOfDay, startOfDay } from 'date-fns';
@@ -92,30 +92,14 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       const [customersData] = await Promise.all([customersPromise]);
       setCustomers(customersData);
 
-      const customerIdsOfTeam = new Set(customersData.map(c => c.id));
-
-      const tasksDataPromise = getFollowUpTasks().then(allTasks => ({
-        renewal: allTasks.renewal.filter(t => customerIdsOfTeam.has(t.customerId)),
-        aftersales: allTasks.aftersales.filter(t => customerIdsOfTeam.has(t.customerId)),
-      }));
-
-      const opportunityTasksPromise = getOpportunityTasksFromDb().then(allOppTasks =>
-        allOppTasks.filter(t => customerIdsOfTeam.has(t.customerId))
-      );
-
       const historyDataPromise = api.analyses.list().then(r => r.analyses);
       const logsDataPromise = api.activities.list(30).then(r => r.activities);
 
-      const [tasksResult, opportunityResult, historyResult, logsResult] = await Promise.allSettled([
-        tasksDataPromise,
-        opportunityTasksPromise,
+      const [historyResult, logsResult] = await Promise.allSettled([
         historyDataPromise,
         logsDataPromise,
       ]);
 
-      if (tasksResult.status === 'fulfilled') {
-        setTasks({ ...tasksResult.value, opportunity: opportunityResult.status === 'fulfilled' ? opportunityResult.value : [] });
-      }
       if (historyResult.status === 'fulfilled') {
         setAnalysisHistory(historyResult.value);
       }
