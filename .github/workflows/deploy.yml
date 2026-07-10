@@ -7,6 +7,9 @@ on:
 
 env:
   NODE_VERSION: '20'
+  APP_DIR: /var/www/salescore
+  RELEASES_DIR: /var/www/salescore-releases
+  BACKUPS_DIR: /var/www/salescore-backups
 
 jobs:
   typecheck-and-build:
@@ -26,26 +29,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck (frontend + backend)
+      - name: Typecheck
         run: npm run typecheck
 
-      - name: Build frontend
+      - name: Build
         run: npm run build
-
-      - name: Build backend
-        run: npm --workspace @salescore/backend run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: |
-            apps/frontend/.next/standalone/
-            apps/frontend/.next/static/
-            apps/frontend/public/
-            apps/backend/dist/
-            node_modules/
-          retention-days: 1
 
   deploy:
     name: Deploy to VPS
@@ -54,11 +42,33 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create deploy archive
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='apps/frontend/.next' \
+            --exclude='apps/backend/dist' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='apps/frontend/.env' \
+            --exclude='apps/frontend/.env.local' \
+            --exclude='apps/backend/.env' \
+            -czf /tmp/salescore-${{ github.sha }}.tar.gz .
+
+      - name: Upload archive to VPS
+        uses: appleboy/scp-action@v0.1.7
         with:
-          name: build-output
-          path: /tmp/salescore-build
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT || '22' }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: /tmp/salescore-${{ github.sha }}.tar.gz
+          target: /tmp
+          strip_components: 1
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -68,29 +78,58 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            set -e
+            set -euo pipefail
 
-            echo ">>> Stopping services..."
-            pm2 stop salescore-frontend salescore-backend 2>/dev/null || true
+            APP_DIR='${{ env.APP_DIR }}'
+            RELEASES_DIR='${{ env.RELEASES_DIR }}'
+            BACKUPS_DIR='${{ env.BACKUPS_DIR }}'
+            RELEASE_DIR="$RELEASES_DIR/${{ github.sha }}"
+            BACKUP_DIR="$BACKUPS_DIR/salescore-before-${{ github.sha }}"
+            ARCHIVE="/tmp/salescore-${{ github.sha }}.tar.gz"
 
-            echo ">>> Syncing code..."
-            cd /opt/salescore
-            git pull origin main
+            echo '>>> Preparing release directory...'
+            mkdir -p "$RELEASES_DIR" "$BACKUPS_DIR" /var/log/salescore
+            rm -rf "$RELEASE_DIR"
+            mkdir -p "$RELEASE_DIR"
+            tar -xzf "$ARCHIVE" -C "$RELEASE_DIR"
 
-            echo ">>> Installing dependencies..."
+            echo '>>> Preserving production env files...'
+            cp -p "$APP_DIR/apps/backend/.env" "$RELEASE_DIR/apps/backend/.env" 2>/dev/null || true
+            cp -p "$APP_DIR/apps/frontend/.env.local" "$RELEASE_DIR/apps/frontend/.env.local" 2>/dev/null || true
+
+            echo '>>> Installing dependencies...'
+            cd "$RELEASE_DIR"
             npm ci
 
-            echo ">>> Running database migrations..."
-            psql -h $PGHOST -U $PGUSER -d $PGDATABASE -f apps/backend/db/001_initial.sql 2>/dev/null || true
-
-            echo ">>> Building frontend..."
+            echo '>>> Building release...'
             npm run build
+            test -f apps/backend/dist/index.js
+            test -f apps/frontend/.next/standalone/apps/frontend/server.js
 
-            echo ">>> Building backend..."
-            npm --workspace @salescore/backend run build
+            rollback() {
+              echo '>>> Rolling back release...'
+              rm -f "$APP_DIR"
+              if [ -e "$BACKUP_DIR" ]; then
+                mv "$BACKUP_DIR" "$APP_DIR"
+                pm2 restart salescore-backend salescore-frontend --update-env || true
+              fi
+            }
 
-            echo ">>> Starting services..."
-            pm2 start deploy/ecosystem.config.cjs 2>/dev/null || pm2 restart salescore-frontend salescore-backend
+            echo '>>> Switching live symlink...'
+            rm -rf "$BACKUP_DIR"
+            if [ -e "$APP_DIR" ] || [ -L "$APP_DIR" ]; then
+              mv "$APP_DIR" "$BACKUP_DIR"
+            fi
+            ln -s "$RELEASE_DIR" "$APP_DIR"
+
+            echo '>>> Reloading PM2 services...'
+            pm2 startOrReload "$APP_DIR/deploy/ecosystem.config.cjs" --update-env
+
+            echo '>>> Health checks...'
+            sleep 5
+            curl -fsS --max-time 10 http://127.0.0.1:4000/api/v1/health || { rollback; exit 1; }
+            curl -fsS -o /dev/null -w 'public=%{http_code}\n' --max-time 15 https://ocr.contrivent.com || { rollback; exit 1; }
+
             pm2 save
-
-            echo ">>> Deployment complete!"
+            rm -f "$ARCHIVE"
+            echo '>>> Deployment complete.'
