@@ -47,6 +47,7 @@ jobs:
 
       - name: Create deploy archive
         run: |
+          ARCHIVE="$RUNNER_TEMP/salescore-${{ github.sha }}.tar.gz"
           tar \
             --exclude='.git' \
             --exclude='node_modules' \
@@ -57,8 +58,9 @@ jobs:
             --exclude='apps/frontend/.env' \
             --exclude='apps/frontend/.env.local' \
             --exclude='apps/backend/.env' \
-            --exclude='salescore-${{ github.sha }}.tar.gz' \
-            -czf salescore-${{ github.sha }}.tar.gz .
+            -czf "$ARCHIVE" .
+          mv "$ARCHIVE" salescore-${{ github.sha }}.tar.gz
+          test -s salescore-${{ github.sha }}.tar.gz
 
       - name: Upload archive to VPS
         uses: appleboy/scp-action@v0.1.7
