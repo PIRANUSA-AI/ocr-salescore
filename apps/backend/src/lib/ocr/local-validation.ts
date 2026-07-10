@@ -1,5 +1,5 @@
 import { resolveMx } from 'dns/promises';
-import type { OcrResult } from './types';
+import type { OcrResult } from './types.js';
 
 export type EmailLocalStatus =
   | 'empty'

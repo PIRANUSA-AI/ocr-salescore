@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { buildSystemPrompt } from './system';
-import { buildLogicPrompt } from './logic';
-import { buildGuardrailPrompt } from './guardrails';
-import { buildUserPrompt } from './template';
-import { buildVerifierSystemPrompt, buildVerifierUserPrompt } from './verifier';
-import { VALID_CONFIDENCE, OCR_FIELDS, type OcrResult, type OcrField, type FormAnswer, type Confidence } from '../types';
+import { buildSystemPrompt } from './system.js';
+import { buildLogicPrompt } from './logic.js';
+import { buildGuardrailPrompt } from './guardrails.js';
+import { buildUserPrompt } from './template.js';
+import { buildVerifierSystemPrompt, buildVerifierUserPrompt } from './verifier.js';
+import { VALID_CONFIDENCE, OCR_FIELDS, type OcrResult, type OcrField, type FormAnswer, type Confidence } from '../types.js';
 
 export function buildOcrSystemPrompt(): string {
   return `${buildSystemPrompt()}
@@ -111,7 +111,7 @@ function inferNameFromEmail(email: string): string | null {
   return cleaned.join(' ');
 }
 
-export { buildVerifierSystemPrompt, buildVerifierUserPrompt } from './verifier';
+export { buildVerifierSystemPrompt, buildVerifierUserPrompt } from './verifier.js';
 
 export function buildVerifierMessages(primaryResult?: Record<string, any>) {
   return {

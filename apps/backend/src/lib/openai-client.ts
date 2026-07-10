@@ -33,7 +33,7 @@ export async function callOpenAI<T>(params: OpenAICallParams<T>): Promise<T> {
 
   const userContent: any[] = [{ type: 'text', text: params.userPrompt }];
   if (params.imageDataUri) {
-    userContent.push({ type: 'image_url', image_url: { url: params.imageDataUri } });
+    userContent.push({ type: 'image_url', image_url: { url: normalizeImageUrl(params.imageDataUri) } });
   }
   messages.push({ role: 'user', content: userContent });
 
@@ -80,7 +80,7 @@ export async function callOpenAIText(params: {
 
   const userContent: any[] = [{ type: 'text', text: params.userPrompt }];
   if (params.imageDataUri) {
-    userContent.push({ type: 'image_url', image_url: { url: params.imageDataUri } });
+    userContent.push({ type: 'image_url', image_url: { url: normalizeImageUrl(params.imageDataUri) } });
   }
   messages.push({ role: 'user', content: userContent });
 
@@ -149,4 +149,13 @@ function usesCompletionTokens(model: string): boolean {
 
 function isResponsesOnlyModel(model: string): boolean {
   return /^gpt-5-pro($|-)/.test(model) || /^gpt-5\.\d+-pro($|-)/.test(model);
+}
+
+function normalizeImageUrl(value: string): string {
+  const trimmed = value.trim();
+  if (/^https?:\/\//i.test(trimmed) || /^data:image\//i.test(trimmed)) return trimmed;
+  if (/^[A-Za-z0-9+/=\r\n]+$/.test(trimmed) && trimmed.length > 100) {
+    return `data:image/jpeg;base64,${trimmed.replace(/\s/g, '')}`;
+  }
+  return trimmed;
 }

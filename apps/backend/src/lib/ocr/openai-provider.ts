@@ -1,6 +1,6 @@
 import { callOpenAI } from '../openai-client.js';
-import type { OcrProvider, OcrResult } from './types';
-import { buildOcrMessages, OcrResultSchema, coerceOcrResult } from './prompt';
+import type { OcrProvider, OcrResult } from './types.js';
+import { buildOcrMessages, OcrResultSchema, coerceOcrResult } from './prompt/index.js';
 
 export function createOpenAIProvider(): OcrProvider {
   const model = process.env.OPENAI_OCR_MODEL || 'gpt-4.1';

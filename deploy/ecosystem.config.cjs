@@ -6,7 +6,7 @@ module.exports = {
   apps: [
     {
       name: 'salescore-frontend',
-      cwd: '/opt/salescore/apps/frontend',
+      cwd: '/var/www/salescore/apps/frontend/.next/standalone/apps/frontend',
       script: 'server.js',
       args: '',
       env: {
@@ -26,7 +26,7 @@ module.exports = {
     },
     {
       name: 'salescore-backend',
-      cwd: '/opt/salescore/apps/backend',
+      cwd: '/var/www/salescore/apps/backend',
       script: 'dist/index.js',
       args: '',
       env: {
@@ -38,17 +38,6 @@ module.exports = {
         PGPASSWORD: 'salescore_pass',
         PGDATABASE: 'salescore',
         PG_POOL_SIZE: '15',
-        R2_ACCOUNT_ID: '',
-        R2_ACCESS_KEY_ID: '',
-        R2_SECRET_ACCESS_KEY: '',
-        R2_BUCKET: 'salescore-ocr',
-        OPENAI_API_KEY: '',
-        OPENAI_OCR_MODEL: '',
-        OPENAI_PREFLIGHT_MODEL: '',
-        OPENAI_BOX_SCAN_MODEL: '',
-        OPENAI_IDENTITY_REVIEW_MODEL: '',
-        OPENAI_VERIFIER_MODEL: '',
-        SESSION_SECRET: 'generate-a-random-secret-here',
       },
       instances: 1,
       exec_mode: 'fork',

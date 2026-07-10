@@ -1,18 +1,18 @@
 import { callOpenAI } from '../openai-client.js';
-import { createOpenAIProvider } from './openai-provider';
-import { createOllamaProvider } from './ollama-provider';
-import { OCR_FIELDS, type Confidence, type OcrField, type OcrResult } from './types';
-import { buildVerifierSystemPrompt, buildVerifierUserPrompt, OcrResultSchema, coerceOcrResult } from './prompt';
-import { buildIdentityReviewSystemPrompt, buildIdentityReviewUserPrompt } from './prompt/identity-review';
+import { createOpenAIProvider } from './openai-provider.js';
+import { createOllamaProvider } from './ollama-provider.js';
+import { OCR_FIELDS, type Confidence, type OcrField, type OcrResult } from './types.js';
+import { buildVerifierSystemPrompt, buildVerifierUserPrompt, OcrResultSchema, coerceOcrResult } from './prompt/index.js';
+import { buildIdentityReviewSystemPrompt, buildIdentityReviewUserPrompt } from './prompt/identity-review.js';
 import {
   BoxScanSchema,
   buildBoxScanSystemPrompt,
   buildBoxScanUserPrompt,
   coerceBoxScanResult,
   formatBoxScanContext,
-} from './prompt/box-scan';
-import { applySkepticAudit } from './skeptic-audit';
-import { validateOcrLocally, type OcrLocalValidation } from './local-validation';
+} from './prompt/box-scan.js';
+import { applySkepticAudit } from './skeptic-audit.js';
+import { validateOcrLocally, type OcrLocalValidation } from './local-validation.js';
 
 const OCR_SCALAR_FIELDS = OCR_FIELDS.filter((f) => f !== 'formAnswers') as (keyof Omit<OcrResult, 'formAnswers'>)[];
 const REVIEW_FIELDS = OCR_SCALAR_FIELDS;

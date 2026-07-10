@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { ocrJobRepo } from '../repositories/ocr-jobs.js';
 import { processOcrSync } from '../services/ocr-service.js';
 import type { SessionPayload } from '../types/index.js';
+import { deleteFromR2 } from '../lib/r2.js';
 
 const ocr = new Hono<{ Variables: { session: SessionPayload | null } }>();
 
@@ -40,6 +41,32 @@ ocr.get('/jobs/:id', async (c) => {
   const job = await ocrJobRepo.findById(c.req.param('id'));
   if (!job) return c.json({ error: 'Job not found' }, 404);
   return c.json({ job });
+});
+
+// DELETE /api/v1/ocr/jobs/:id — hapus job dan file R2
+ocr.delete('/jobs/:id', async (c) => {
+  const session: SessionPayload | null = c.get('session');
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+  const id = c.req.param('id');
+  const job = await ocrJobRepo.findById(id);
+  if (!job) return c.json({ error: 'Job not found' }, 404);
+  if (job.userId !== session.uid) return c.json({ error: 'Unauthorized' }, 403);
+  
+  if (job.imageUrl) {
+    try {
+      const url = new URL(job.imageUrl);
+      const pathname = decodeURIComponent(url.pathname);
+      const key = pathname.startsWith('/') ? pathname.slice(1) : pathname;
+      if (key.startsWith('ocr/')) {
+        await deleteFromR2(key);
+      }
+    } catch (err: any) {
+      console.error('[ocr] delete R2 error:', err.message);
+    }
+  }
+  
+  const success = await ocrJobRepo.delete(id, session.uid);
+  return c.json({ success });
 });
 
 export { ocr };

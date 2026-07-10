@@ -1,4 +1,4 @@
-import { OCR_FIELDS, OCR_FIELD_LABELS } from '../types';
+import { OCR_FIELDS, OCR_FIELD_LABELS } from '../types.js';
 
 export function buildFieldList(): string {
   return OCR_FIELDS

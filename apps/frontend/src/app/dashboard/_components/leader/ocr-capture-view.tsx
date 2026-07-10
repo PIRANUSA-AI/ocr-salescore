@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, XCircle, Clock, Image as ImageIcon, ChevronLeft } from 'lucide-react';
+import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, XCircle, Clock, Image as ImageIcon, ChevronLeft, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useDashboard } from '@/app/dashboard/dashboard-context';
@@ -34,7 +34,8 @@ interface OcrJobData {
   status: 'pending' | 'processing' | 'done' | 'error';
   createdAt: string;
   updatedAt: string;
-  error?: string;
+  errorMessage?: string;
+  imageUrl?: string | null;
   result?: {
     name: { value: string; alternatives: string[]; confidence: Confidence };
     company: { value: string; alternatives: string[]; confidence: Confidence };
@@ -116,7 +117,11 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     if (!userProfile?.uid) return;
     const poll = () => {
       api.ocr.listJobs(20).then(r => {
-        setJobs(r.jobs as OcrJobData[]);
+        setJobs(prevJobs => {
+          const tempJobs = prevJobs.filter(j => j.id.startsWith('temp-'));
+          const backendJobs = r.jobs as OcrJobData[];
+          return [...tempJobs, ...backendJobs.filter(bj => !tempJobs.some(tj => tj.id === bj.id))];
+        });
       }).catch(() => {});
     };
     poll();
@@ -207,21 +212,55 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
   const processImage = useCallback(async (dataUri: string) => {
     if (!userProfile?.uid) return;
-    const compressed = await compressImageToDataUri(dataUri);
-
-    setPreviews(prev => ({ ...prev, [dataUri]: dataUri }));
+    
+    const tempId = `temp-${Date.now()}`;
+    const tempJob: OcrJobData = {
+      id: tempId,
+      userId: userProfile.uid,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    setJobs(prev => [tempJob, ...prev]);
+    setPreviews(prev => ({ ...prev, [tempId]: dataUri }));
+    setActiveJobId(tempId);
     resetForm();
 
     try {
+      const compressed = await compressImageToDataUri(dataUri);
+      setJobs(prev => prev.map(j => j.id === tempId ? { ...j, status: 'processing' } : j));
+      
       const { job } = await api.ocr.process(compressed);
-      setActiveJobId(job.id);
-      // refresh job list
-      api.ocr.listJobs(20).then(r => setJobs(r.jobs as OcrJobData[])).catch(() => {});
+      
+      setPreviews(prev => ({ ...prev, [job.id]: dataUri }));
+      setJobs(prev => prev.map(j => j.id === tempId ? (job as OcrJobData) : j));
+      setActiveJobId(prev => prev === tempId ? job.id : prev);
     } catch (err: any) {
       console.error('[OCR] process error:', err);
-      toast({ variant: 'destructive', title: 'OCR Gagal', description: err.message });
+      const errMsg = err.message || 'Terjadi kesalahan saat memproses gambar.';
+      toast({ variant: 'destructive', title: 'OCR Gagal', description: errMsg });
+      setJobs(prev => prev.map(j => j.id === tempId ? { ...j, status: 'error', errorMessage: errMsg } : j));
     }
   }, [userProfile, resetForm, toast]);
+
+  const handleDeleteJob = async (id: string) => {
+    if (id.startsWith('temp-')) {
+      setJobs(prev => prev.filter(j => j.id !== id));
+      if (activeJobId === id) setActiveJobId(null);
+      return;
+    }
+
+    try {
+      await api.ocr.deleteJob(id);
+      setJobs(prev => prev.filter(j => j.id !== id));
+      if (activeJobId === id) setActiveJobId(null);
+      toast({ title: 'Berhasil dihapus', description: 'Job OCR berhasil dihapus.' });
+    } catch (err: any) {
+      console.error('[OCR] delete error:', err);
+      toast({ variant: 'destructive', title: 'Gagal menghapus', description: err.message || 'Terjadi kesalahan.' });
+    }
+  };
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -503,33 +542,44 @@ export function OcrCaptureView({ recentCustomers }: Props) {
               const isActive = job.id === activeJobId;
               const preview = previews[job.id];
               return (
-                <button
-                  key={job.id}
-                  onClick={() => setActiveJobId(job.id)}
-                  className={cn(
-                    "flex flex-col items-center gap-1 rounded-lg border p-2 min-w-[80px] w-[80px] shrink-0 transition-all cursor-pointer",
-                    isActive ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-muted bg-card hover:border-muted-foreground/30"
-                  )}
-                >
-                  <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-                    {preview ? (
-                      <img src={preview} alt="" className="w-full h-full object-cover" />
-                    ) : job.result?.imageUrl ? (
-                      <img src={job.result.imageUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                <div key={job.id} className="relative group shrink-0">
+                  <button
+                    onClick={() => setActiveJobId(job.id)}
+                    className={cn(
+                      "flex flex-col items-center gap-1 rounded-lg border p-2 min-w-[80px] w-[80px] transition-all cursor-pointer",
+                      isActive ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-muted bg-card hover:border-muted-foreground/30"
                     )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {job.status === 'pending' && <Clock className="h-3 w-3 text-muted-foreground" />}
-                    {job.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-                    {job.status === 'done' && <Check className="h-3 w-3 text-green-600" />}
-                    {job.status === 'error' && <XCircle className="h-3 w-3 text-destructive" />}
-                    <span className="text-[10px] text-muted-foreground truncate">
-                      {job.status === 'pending' ? 'Antri' : job.status === 'processing' ? 'Proses' : job.status === 'done' ? (job.result?.name.value?.split(' ')[0] || 'Selesai') : 'Gagal'}
-                    </span>
-                  </div>
-                </button>
+                  >
+                    <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex items-center justify-center">
+                      {preview ? (
+                        <img src={preview} alt="" className="w-full h-full object-cover" />
+                      ) : job.result?.imageUrl ? (
+                        <img src={job.result.imageUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {job.status === 'pending' && <Clock className="h-3 w-3 text-muted-foreground" />}
+                      {job.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                      {job.status === 'done' && <Check className="h-3 w-3 text-green-600" />}
+                      {job.status === 'error' && <XCircle className="h-3 w-3 text-destructive" />}
+                      <span className="text-[10px] text-muted-foreground truncate">
+                        {job.status === 'pending' ? 'Antri' : job.status === 'processing' ? 'Proses' : job.status === 'done' ? (job.result?.name.value?.split(' ')[0] || 'Selesai') : 'Gagal'}
+                      </span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteJob(job.id);
+                    }}
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:bg-destructive/90 transition-opacity md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
+                    title="Hapus"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -562,7 +612,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
               <XCircle className="h-10 w-10 text-destructive" />
               <div className="text-center">
                 <p className="font-medium">Gagal memproses</p>
-                <p className="text-sm text-muted-foreground mt-1">{activeJob.error}</p>
+                <p className="text-sm text-muted-foreground mt-1">{activeJob.errorMessage}</p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setActiveJobId(null)}>
                 Tutup

@@ -1,6 +1,6 @@
 import axios from 'axios';
-import type { OcrProvider, OcrResult } from './types';
-import { buildOcrMessages, extractJsonObject, coerceOcrResult } from './prompt';
+import type { OcrProvider, OcrResult } from './types.js';
+import { buildOcrMessages, extractJsonObject, coerceOcrResult } from './prompt/index.js';
 
 export function createOllamaProvider(): OcrProvider {
   const apiKey = process.env.OLLAMA_API_KEY;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OCR_FIELDS, VALID_CONFIDENCE, type Confidence } from '../types';
+import { OCR_FIELDS, VALID_CONFIDENCE, type Confidence } from '../types.js';
 
 const BoxFieldSchema = z.enum(['name', 'company', 'jobTitle', 'division', 'phone', 'email', 'softwareNeeds', 'formAnswer', 'unknown']);
 

@@ -1,4 +1,4 @@
-import type { OcrField, OcrResult } from './types';
+import type { OcrField, OcrResult } from './types.js';
 
 const EMPTY_FIELD: OcrField = { value: '', alternatives: [], confidence: 'empty' };
 

@@ -1,4 +1,4 @@
-import type { OcrResult } from '../types';
+import type { OcrResult } from '../types.js';
 
 export function buildIdentityReviewSystemPrompt(): string {
   return `Anda adalah AI OCR Adjudicator untuk PT PIRANUSA.

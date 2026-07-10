@@ -1,4 +1,4 @@
-import type { OcrResult } from '../types';
+import type { OcrResult } from '../types.js';
 
 export function buildVerifierSystemPrompt(): string {
   return `Anda adalah AI Verifier Bahasa Indonesia untuk PT PIRANUSA. Tugas Anda: REVIEW dan KOREKSI hasil ekstraksi OCR berdasarkan kaidah Bahasa Indonesia.

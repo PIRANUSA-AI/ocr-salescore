@@ -123,6 +123,9 @@ export const api = {
     getJob(id: string) {
       return request<{ job: any }>('GET', `/ocr/jobs/${id}`);
     },
+    deleteJob(id: string) {
+      return request<{ success: boolean }>('DELETE', `/ocr/jobs/${id}`);
+    },
   },
 
   // ─── Users ────────────────────────────────────────

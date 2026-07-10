@@ -90,4 +90,12 @@ export const ocrJobRepo = {
     const rows = await query<OcrJobRow>('SELECT * FROM ocr_jobs WHERE id = $1 LIMIT 1', [id]);
     return rows.rows[0] ? rowToJob(rows.rows[0]) : null;
   },
+
+  async delete(id: string, userId: string): Promise<boolean> {
+    const res = await query(
+      'DELETE FROM ocr_jobs WHERE id = $1 AND user_id = $2',
+      [id, userId],
+    );
+    return (res.rowCount ?? 0) > 0;
+  },
 };
