@@ -118,6 +118,13 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     const poll = () => {
       api.ocr.listJobs(20).then(r => {
         setJobs(prevJobs => {
+          // Skip updating from backend if there are active local uploads to prevent doubling
+          const hasActiveUploads = prevJobs.some(
+            j => j.id.startsWith('temp-') && (j.status === 'pending' || j.status === 'processing')
+          );
+          if (hasActiveUploads) {
+            return prevJobs;
+          }
           const tempJobs = prevJobs.filter(j => j.id.startsWith('temp-'));
           const backendJobs = r.jobs as OcrJobData[];
           return [...tempJobs, ...backendJobs.filter(bj => !tempJobs.some(tj => tj.id === bj.id))];
