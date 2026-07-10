@@ -57,7 +57,8 @@ jobs:
             --exclude='apps/frontend/.env' \
             --exclude='apps/frontend/.env.local' \
             --exclude='apps/backend/.env' \
-            -czf /tmp/salescore-${{ github.sha }}.tar.gz .
+            --exclude='salescore-${{ github.sha }}.tar.gz' \
+            -czf salescore-${{ github.sha }}.tar.gz .
 
       - name: Upload archive to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -66,9 +67,8 @@ jobs:
           port: ${{ secrets.VPS_PORT || '22' }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: /tmp/salescore-${{ github.sha }}.tar.gz
+          source: salescore-${{ github.sha }}.tar.gz
           target: /tmp
-          strip_components: 1
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
