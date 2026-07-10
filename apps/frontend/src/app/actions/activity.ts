@@ -19,7 +19,7 @@ type LogActivityInput = z.infer<typeof LogActivitySchema>;
 
 /**
  * Logs a specific user activity to the 'activityLogs' collection in Firestore.
- */
+ ****/
 export async function logActivity(input: LogActivityInput): Promise<{ success: boolean }> {
   console.log(`[Action: logActivity] Logging action by ${input.actorName}: "${input.action}"`);
   const validation = LogActivitySchema.safeParse(input);
