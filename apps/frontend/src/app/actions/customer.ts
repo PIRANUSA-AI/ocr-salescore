@@ -159,63 +159,27 @@ export async function getCustomers(filters?: { assignedSalesId?: string; team?: 
 }
 
 /**
- * Fetches and serializes a single customer by their ID.
+ * Fetches a single customer by their ID from the Postgres backend.
+ * Calls the backend directly (absolute URL) since this runs server-side, where
+ * api-client's relative `/api/v1/...` fetch has no origin to resolve against.
  * @param customerId The ID of the customer to fetch.
  * @returns A promise that resolves to a Customer object or null if not found.
  */
 export async function getCustomerById(customerId: string): Promise<Customer | null> {
     console.log(`[Action: getCustomerById] Fetching customer: ${customerId}`);
     try {
-        const docRef = adminDb.collection('customers').doc(customerId);
-        const docSnap = await docRef.get();
-        if (!docSnap.exists) {
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+        const res = await fetch(`${backendUrl}/api/v1/customers/${customerId}`);
+        if (res.status === 404) {
             console.warn(`[Action: getCustomerById] Pelanggan dengan ID ${customerId} tidak ditemukan.`);
             return null;
         }
-
-        const data = docSnap.data()!;
-
-        // --- SINGLE CUSTOMER MIGRATION LOGIC ---
-        if (!data.acquisitionContext) {
-            data.acquisitionContext = {
-                source: data.source || 'Lainnya',
-                eventName: 'MFI 2025',
-                eventDate: safeISODate(data.createdAt),
-            };
-        } else {
-            data.acquisitionContext.source = data.acquisitionContext.source || 'Lainnya';
-            data.acquisitionContext.eventName = data.acquisitionContext.eventName || 'Tidak Diketahui';
-            data.acquisitionContext.eventDate = safeISODate(data.acquisitionContext.eventDate || data.createdAt);
+        if (!res.ok) {
+            throw new Error(`Backend returned ${res.status}`);
         }
-        // --- END OF MIGRATION LOGIC ---
-
-        const products = Array.isArray(data.products)
-            ? data.products.map((p: any) => ({
-                ...p,
-                purchaseDate: safeISODate(p.purchaseDate),
-            }))
-            : [];
-
-        const generationHistory = Array.isArray(data.generationHistory)
-            ? data.generationHistory.map((h: any) => ({
-                ...h,
-                createdAt: safeISODate(h.createdAt),
-            }))
-            : [];
-
-        const customer: Customer = {
-            ...data,
-            id: docSnap.id,
-            createdAt: safeISODate(data.createdAt),
-            updatedAt: safeISODate(data.updatedAt),
-            products,
-            notes: serializeNotes(data.notes),
-            generationHistory,
-            acquisitionContext: data.acquisitionContext,
-        } as Customer;
-
+        const { customer } = await res.json();
         console.log(`[Action: getCustomerById] SUKSES. Pelanggan ${customerId} ditemukan.`);
-        return customer;
+        return customer as Customer;
     } catch (error) {
         console.error(`[Action: getCustomerById] !!! ERROR untuk pelanggan ${customerId} !!!`, error);
         throw new Error('Gagal mengambil detail pelanggan.');
