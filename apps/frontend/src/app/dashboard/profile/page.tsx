@@ -74,6 +74,10 @@ export default function ProfilePage() {
 
     const handleChangePassword = async () => {
         if (!userProfile) return;
+        if (!currentPassword) {
+            toast({ variant: "destructive", title: "Password Saat Ini Kosong", description: "Masukkan password Anda saat ini." });
+            return;
+        }
         if (newPassword !== confirmPassword) {
             toast({ variant: "destructive", title: "Password Tidak Cocok", description: "Konfirmasi password baru tidak sesuai." });
             return;
@@ -85,13 +89,14 @@ export default function ProfilePage() {
 
         setIsLoading(true);
         try {
-            await api.auth.updatePassword(newPassword);
+            await api.auth.updatePassword(currentPassword, newPassword);
 
             toast({ title: "Sukses", description: "Password berhasil diubah. Silakan login ulang nanti." });
+            setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
         } catch (error) {
-            toast({ variant: "destructive", title: "Error", description: "Terjadi kesalahan sistem." });
+            toast({ variant: "destructive", title: "Error", description: error instanceof Error ? error.message : "Terjadi kesalahan sistem." });
         } finally {
             setIsLoading(false);
         }
@@ -200,6 +205,16 @@ export default function ProfilePage() {
                         </CardHeader>
                         <CardContent className="space-y-4 max-w-md">
                             <div className="space-y-2">
+                                <Label htmlFor="current-password">Password Saat Ini</Label>
+                                <Input
+                                    id="current-password"
+                                    type="password"
+                                    value={currentPassword}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
+                                    placeholder="Masukkan password Anda saat ini"
+                                />
+                            </div>
+                            <div className="space-y-2">
                                 <Label htmlFor="new-password">Password Baru</Label>
                                 <Input
                                     id="new-password"
@@ -220,7 +235,7 @@ export default function ProfilePage() {
                                 />
                             </div>
                             <div className="flex justify-end pt-4">
-                                <Button onClick={handleChangePassword} disabled={isLoading || !newPassword}>
+                                <Button onClick={handleChangePassword} disabled={isLoading || !currentPassword || !newPassword}>
                                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                                     Update Password
                                 </Button>

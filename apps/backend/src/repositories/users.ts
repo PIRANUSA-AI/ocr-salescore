@@ -38,6 +38,11 @@ export const userRepo = {
     return rows.rows[0] ? rowToProfile(rows.rows[0]) : null;
   },
 
+  async findPasswordHash(id: string): Promise<string | null> {
+    const rows = await query<Pick<UserRow, 'password_hash'>>('SELECT password_hash FROM users WHERE id = $1 LIMIT 1', [id]);
+    return rows.rows[0]?.password_hash ?? null;
+  },
+
   async create(input: {
     id: string;
     name: string;

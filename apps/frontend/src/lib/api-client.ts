@@ -54,8 +54,8 @@ export const api = {
     updateProfile(input: { name?: string; photoURL?: string }) {
       return request<{ success: boolean }>('PUT', '/auth/profile', input);
     },
-    updatePassword(password: string) {
-      return request<{ success: boolean }>('PUT', '/auth/password', { password });
+    updatePassword(currentPassword: string, password: string) {
+      return request<{ success: boolean }>('PUT', '/auth/password', { currentPassword, password });
     },
   },
 

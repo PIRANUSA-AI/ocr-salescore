@@ -94,7 +94,20 @@ auth.put('/password', async (c) => {
   const session: SessionPayload | null = c.get('session');
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
-  const { password } = await c.req.json<{ password: string }>();
+  const { currentPassword, password } = await c.req.json<{ currentPassword: string; password: string }>();
+  if (!currentPassword || !password) {
+    return c.json({ error: 'Password saat ini dan password baru wajib diisi.' }, 400);
+  }
+  if (password.length < 6) {
+    return c.json({ error: 'Password baru minimal 6 karakter.' }, 400);
+  }
+
+  const currentHash = await userRepo.findPasswordHash(session.uid);
+  if (!currentHash) return c.json({ error: 'Unauthorized' }, 401);
+
+  const ok = await bcrypt.compare(currentPassword, currentHash);
+  if (!ok) return c.json({ error: 'Password saat ini salah.' }, 401);
+
   const hash = await bcrypt.hash(password, 10);
   await userRepo.updatePassword(session.uid, hash);
   return c.json({ success: true });
