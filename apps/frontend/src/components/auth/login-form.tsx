@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { signInWithEmailAndPassword, type AuthError } from 'firebase/auth';
@@ -15,50 +15,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Email tidak valid.' }),
   password: z.string().min(1, { message: 'Minimal 1 karakter.' }),
 });
 
-const leaderSignupSchema = z.object({
-  name: z.string().min(1, 'Nama wajib diisi.'),
-  email: z.string().email('Email tidak valid.'),
-  password: z.string().min(1, 'Minimal 1 karakter.'),
-  team: z.enum(['AEC', 'MFG'], { required_error: 'Tim harus dipilih.' }),
-  specialKey: z.string().refine(val => val === "LeadPira", { message: "Kunci khusus tidak valid." }),
-  role: z.literal('Leader'),
-});
-
-const salesSignupSchema = z.object({
-  name: z.string().min(1, 'Nama wajib diisi.'),
-  email: z.string().email('Email tidak valid.'),
-  password: z.string().min(1, 'Minimal 1 karakter.'),
-  team: z.enum(['AEC', 'MFG'], { required_error: 'Tim harus dipilih.' }),
-  role: z.literal('Sales'),
-});
-
-const superadminSignupSchema = z.object({
-  name: z.string().min(1, 'Nama wajib diisi.'),
-  email: z.string().email('Email tidak valid.'),
-  password: z.string().min(1, 'Minimal 1 karakter.'),
-  team: z.enum(['AEC', 'MFG'], { required_error: 'Tim harus dipilih.' }),
-  specialKey: z.string().refine(val => val === "SuperPira", { message: "Kunci khusus tidak valid." }),
-  role: z.literal('Superadmin'),
-});
-
-const signupSchema = z.union([leaderSignupSchema, salesSignupSchema, superadminSignupSchema]);
-type SignupFormData = z.infer<typeof signupSchema>;
-
 const AUTH_MODE = process.env.NEXT_PUBLIC_AUTH_MODE || 'local';
 
-interface LoginFormProps {
-  isSignup: boolean;
-  setIsSignup: (value: boolean) => void;
-}
-
-export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
+export function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -67,14 +32,6 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
   const loginForm = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
-  });
-
-  const signupForm = useForm<SignupFormData>({
-    resolver: zodResolver(signupSchema),
-    defaultValues: {
-      name: '', email: '', password: '',
-      role: 'Sales', team: undefined, specialKey: undefined,
-    } as any,
   });
 
   const handleAuthError = (error: AuthError) => {
@@ -121,92 +78,6 @@ export function LoginForm({ isSignup, setIsSignup }: LoginFormProps) {
       setIsLoading(false);
     }
   };
-
-  const handleSignup = async (data: SignupFormData) => {
-    setIsLoading(true);
-    // Pad password shorter than 6 chars
-    const finalPassword = data.password.length < 6 ? data.password.repeat(6).slice(0, 6) : data.password;
-    const submissionData = { ...data, password: finalPassword };
-
-    const result = await api.auth.signup(submissionData).then(() => ({ success: true as const, error: null }))
-      .catch((e: Error) => ({ success: false as const, error: e.message }));
-    setIsLoading(false);
-    if (result.success) {
-      toast({ title: 'Pendaftaran Berhasil', description: 'Silakan masuk untuk melanjutkan.' });
-      setIsSignup(false);
-    } else {
-      toast({ variant: 'destructive', title: 'Pendaftaran Gagal', description: result.error });
-    }
-  };
-
-  const watchedRole = signupForm.watch('role');
-
-  if (isSignup) {
-    return (
-      <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="signup-name">Nama Lengkap</Label>
-          <Input id="signup-name" placeholder="Nama Anda" {...signupForm.register('name')} disabled={isLoading} />
-          {signupForm.formState.errors.name && <p className="text-xs text-destructive">{signupForm.formState.errors.name.message}</p>}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="signup-email">Email</Label>
-          <Input id="signup-email" type="email" placeholder="nama@contoh.com" {...signupForm.register('email')} disabled={isLoading} />
-          {signupForm.formState.errors.email && <p className="text-xs text-destructive">{signupForm.formState.errors.email.message}</p>}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="signup-password">Kata Sandi</Label>
-          <Input id="signup-password" type="password" {...signupForm.register('password')} disabled={isLoading} />
-          {signupForm.formState.errors.password && <p className="text-xs text-destructive">{signupForm.formState.errors.password.message}</p>}
-        </div>
-        <div className="space-y-1.5">
-          <Label>Peran</Label>
-          <Controller
-            control={signupForm.control}
-            name="role"
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
-                <SelectTrigger><SelectValue placeholder="Pilih peran..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Sales">Sales</SelectItem>
-                  <SelectItem value="Leader">Leader</SelectItem>
-                  <SelectItem value="Superadmin">Superadmin</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Tim</Label>
-          <Controller
-            control={signupForm.control}
-            name="team"
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
-                <SelectTrigger><SelectValue placeholder="Pilih tim..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AEC">AEC (Architecture)</SelectItem>
-                  <SelectItem value="MFG">MFG (Manufacturing)</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {signupForm.formState.errors.team && <p className="text-xs text-destructive">{signupForm.formState.errors.team.message}</p>}
-        </div>
-        {(watchedRole === 'Leader' || watchedRole === 'Superadmin') && (
-          <div className="space-y-1.5">
-            <Label htmlFor="specialKey">Kunci Rahasia</Label>
-            <Input id="specialKey" type="password" {...signupForm.register('specialKey')} disabled={isLoading} />
-            {(signupForm.formState.errors as any).specialKey && <p className="text-xs text-destructive">{(signupForm.formState.errors as any).specialKey?.message}</p>}
-          </div>
-        )}
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Daftar
-        </Button>
-      </form>
-    );
-  }
 
   return (
     <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">

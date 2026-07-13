@@ -20,12 +20,15 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/icons/logo';
 
 export function MobileHeader() {
-    const { userProfile } = useAuth();
+    const { userProfile, refreshLocalSession } = useAuth();
     const router = useRouter();
 
     const handleLogout = async () => {
         if ((process.env.NEXT_PUBLIC_AUTH_MODE || 'local') === 'local') {
             await api.auth.logout();
+            // Clear stale user/userProfile in AuthContext, else LoginPage's
+            // redirect-if-logged-in effect bounces straight back to /dashboard.
+            await refreshLocalSession?.();
         } else {
             await signOut(auth);
         }

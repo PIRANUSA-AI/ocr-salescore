@@ -8,12 +8,10 @@ import { LoginForm } from '@/components/auth/login-form';
 import { QuickOcrDialog } from '@/components/auth/quick-ocr-dialog';
 import { Button } from '@/components/ui/button';
 import { ScanLine } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LoginPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [isSignup, setIsSignup] = useState(false);
   const [isOcrOpen, setIsOcrOpen] = useState(false);
 
   useEffect(() => {
@@ -81,36 +79,9 @@ export default function LoginPage() {
                 <Logo width={120} height={30} className="text-primary" />
               </div>
 
-              <div className="flex items-center gap-2 mb-6">
-                <button
-                  onClick={() => setIsSignup(false)}
-                  className={`px-4 py-1.5 text-sm rounded-full transition-colors ${
-                    !isSignup ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Masuk
-                </button>
-                <button
-                  onClick={() => setIsSignup(true)}
-                  className={`px-4 py-1.5 text-sm rounded-full transition-colors ${
-                    isSignup ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Daftar
-                </button>
-              </div>
+              <h2 className="mb-6 text-lg font-semibold text-foreground">Masuk</h2>
 
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={isSignup ? 'signup' : 'login'}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <LoginForm isSignup={isSignup} setIsSignup={setIsSignup} />
-                </motion.div>
-              </AnimatePresence>
+              <LoginForm />
 
               <div className="relative my-6 flex items-center">
                 <div className="flex-grow border-t" />

@@ -12,11 +12,15 @@ import { OcrFunnel } from './ocr-funnel';
 import { OcrDataQuality } from './ocr-data-quality';
 import { OcrReportExport } from './ocr-report-export';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { FadeIn } from '@/components/ui/fade-in';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 
 const RANGE_OPTIONS: { value: OcrTimeRange; label: string }[] = [
   { value: 'today', label: 'Hari Ini' },
+  { value: 'yesterday', label: 'Kemarin' },
   { value: '7d', label: '7 Hari' },
   { value: '30d', label: '30 Hari' },
   { value: 'all', label: 'Semua' },
@@ -44,21 +48,37 @@ export default function ReportPage() {
   const isSuperadmin = userProfile?.role === 'Superadmin';
   const [ocrRange, setOcrRange] = useState<OcrTimeRange>('30d');
   const [ocrTeam, setOcrTeam] = useState<OcrTeamFilter>('all');
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
   const [ocrData, setOcrData] = useState<OcrReportData | null>(null);
   const [ocrLoading, setOcrLoading] = useState(true);
 
   useEffect(() => {
     if (!userProfile) return;
+    if (ocrRange === 'custom' && !customDateRange?.from) return;
     setOcrLoading(true);
     const team = userProfile.role === 'Leader' ? userProfile.team : ocrTeam;
-    api.reports.ocr({ range: ocrRange, team })
+    const params =
+      ocrRange === 'custom' && customDateRange?.from
+        ? {
+            range: ocrRange,
+            team,
+            from: format(customDateRange.from, 'yyyy-MM-dd'),
+            to: format(customDateRange.to || customDateRange.from, 'yyyy-MM-dd'),
+          }
+        : { range: ocrRange, team };
+    api.reports.ocr(params)
       .then((res) => setOcrData(res.report as OcrReportData))
       .catch((err) => {
         console.error('[OCR Report]', err);
         setOcrData(null);
       })
       .finally(() => setOcrLoading(false));
-  }, [userProfile, ocrRange, ocrTeam]);
+  }, [userProfile, ocrRange, ocrTeam, customDateRange]);
+
+  const handleCustomDateChange = (range: DateRange | undefined) => {
+    setCustomDateRange(range);
+    if (range?.from) setOcrRange('custom');
+  };
 
   if (ocrLoading && !ocrData) return <Skeleton />;
   if (!ocrData) {
@@ -66,7 +86,12 @@ export default function ReportPage() {
   }
 
   // Label & param untuk export
-  const periodeLabel = RANGE_OPTIONS.find((o) => o.value === ocrRange)?.label || ocrRange;
+  const periodeLabel =
+    ocrRange === 'custom' && customDateRange?.from
+      ? customDateRange.to && customDateRange.to.toDateString() !== customDateRange.from.toDateString()
+        ? `${format(customDateRange.from, 'd MMM yyyy')} - ${format(customDateRange.to, 'd MMM yyyy')}`
+        : format(customDateRange.from, 'd MMM yyyy')
+      : RANGE_OPTIONS.find((o) => o.value === ocrRange)?.label || ocrRange;
   const timLabel =
     userProfile?.role === 'Leader'
       ? `Tim ${userProfile.team}`
@@ -84,19 +109,22 @@ export default function ReportPage() {
 
       {/* Filter bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center rounded-lg border bg-card p-0.5 w-fit">
-          {RANGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setOcrRange(opt.value)}
-              className={cn(
-                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
-                ocrRange === opt.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-lg border bg-card p-0.5 w-fit">
+            {RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => { setOcrRange(opt.value); setCustomDateRange(undefined); }}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                  ocrRange === opt.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <DateRangePicker range={customDateRange} onRangeChange={handleCustomDateChange} className="[&_button#date]:h-8 [&_button#date]:w-[240px] [&_button#date]:text-xs" />
         </div>
         <div className="flex items-center gap-2">
           {ocrLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Eye, Edit, ScanLine, Trash2, Mail, Phone, PlusCircle, X } from "lucide-react";
+import { Loader2, Search, Eye, Edit, ScanLine, Trash2, Mail, Phone, PlusCircle, X, Filter, ArrowUpDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,12 @@ import { EmailClientDialog } from '../email-client-dialog';
 import { api } from '@/lib/api-client';
 import { FadeIn } from '@/components/ui/fade-in';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { startOfDay, endOfDay } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
+
+type SortOrder = 'default' | 'sales-desc' | 'sales-asc';
 
 const getValidPhoneNumbers = (phone: string | undefined | null): { original: string, number: string; isValid: boolean }[] => {
     if (!phone) return [];
@@ -54,6 +60,9 @@ export const CustomerManager = () => {
     const searchParams = useSearchParams();
     const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
     const [pipelineFilter, setPipelineFilter] = useState('all');
+    const [salesFilter, setSalesFilter] = useState('all');
+    const [dateRange, setDateRange] = useState<DateRange | undefined>();
+    const [sortOrder, setSortOrder] = useState<SortOrder>('default');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
@@ -92,7 +101,7 @@ export const CustomerManager = () => {
 
     const filteredCustomers = useMemo(() => {
         if (!customers) return [];
-        return customers.filter(c => {
+        const filtered = customers.filter(c => {
             const lowercasedTerm = searchTerm.toLowerCase();
             const cleanedSearchTerm = lowercasedTerm.replace(/[^0-9]/g, '');
             const nameMatch = c.name.toLowerCase().includes(lowercasedTerm);
@@ -105,9 +114,31 @@ export const CustomerManager = () => {
             }
             const searchMatch = searchTerm === '' || nameMatch || companyMatch || emailMatch || phoneMatch;
             const pipelineMatch = pipelineFilter === 'all' || c.pipelineStatus === pipelineFilter;
-            return searchMatch && pipelineMatch;
+            const salesMatch = salesFilter === 'all' || (salesFilter === 'unassigned' ? !c.assignedSalesId : c.assignedSalesId === salesFilter);
+            let dateMatch = true;
+            if (dateRange?.from) {
+                const createdAt = new Date(c.createdAt);
+                dateMatch = createdAt >= startOfDay(dateRange.from) && createdAt <= endOfDay(dateRange.to || dateRange.from);
+            }
+            return searchMatch && pipelineMatch && salesMatch && dateMatch;
         });
-    }, [customers, searchTerm, pipelineFilter]);
+
+        if (sortOrder === 'default') return filtered;
+
+        // Urutkan berdasarkan total lead per sales (bukan per-baris) —
+        // sales dgn lead terbanyak/tersedikit dikelompokkan di atas.
+        const countBySales = new Map<string, number>();
+        filtered.forEach(c => {
+            const key = c.assignedSalesId || 'unassigned';
+            countBySales.set(key, (countBySales.get(key) || 0) + 1);
+        });
+        const direction = sortOrder === 'sales-desc' ? -1 : 1;
+        return [...filtered].sort((a, b) => {
+            const countA = countBySales.get(a.assignedSalesId || 'unassigned') || 0;
+            const countB = countBySales.get(b.assignedSalesId || 'unassigned') || 0;
+            return (countA - countB) * direction;
+        });
+    }, [customers, searchTerm, pipelineFilter, salesFilter, dateRange, sortOrder]);
 
     const paginatedCustomers = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -115,9 +146,15 @@ export const CustomerManager = () => {
     }, [filteredCustomers, currentPage, itemsPerPage]);
 
     const pageCount = Math.ceil(filteredCustomers.length / itemsPerPage);
-    const isAnyFilterActive = pipelineFilter !== 'all';
+    const isAnyFilterActive = pipelineFilter !== 'all' || salesFilter !== 'all' || !!dateRange || sortOrder !== 'default';
 
-    const resetFilters = () => { setPipelineFilter('all'); setCurrentPage(1); };
+    const resetFilters = () => {
+        setPipelineFilter('all');
+        setSalesFilter('all');
+        setDateRange(undefined);
+        setSortOrder('default');
+        setCurrentPage(1);
+    };
 
     const handleDownload = () => {
         if (!customers || customers.length === 0) {
@@ -265,8 +302,8 @@ export const CustomerManager = () => {
             <OcrImportDialog isOpen={isOcrDialogOpen} onOpenChange={(open) => setIsOcrDialogOpen(open)} onCustomerAdded={refreshAllData} startInCameraMode={!isMobile} />
 
             {/* Search & Filter */}
-            <div className="flex items-center gap-2">
-                <div className="relative flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[140px]">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input placeholder="Cari..." className="w-full pl-8 h-8 text-sm" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
                 </div>
@@ -275,10 +312,44 @@ export const CustomerManager = () => {
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">Semua</SelectItem>
+                        <SelectItem value="all">Semua Status</SelectItem>
                         {PIPELINE_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                 </Select>
+                <Select value={salesFilter} onValueChange={(v) => { setSalesFilter(v); setCurrentPage(1); }}>
+                    <SelectTrigger className="w-[130px] h-8 text-xs">
+                        <SelectValue placeholder="Sales" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Semua Sales</SelectItem>
+                        <SelectItem value="unassigned">Belum Ditugaskan</SelectItem>
+                        {salesTeam.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                <DateRangePicker
+                    range={dateRange}
+                    onRangeChange={(v) => { setDateRange(v); setCurrentPage(1); }}
+                    className="[&_button#date]:h-8 [&_button#date]:w-[190px] [&_button#date]:text-xs"
+                />
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 relative">
+                            <ArrowUpDown className="h-3.5 w-3.5" />
+                            {sortOrder !== 'default' && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={() => setSortOrder('default')} className={cn('text-sm', sortOrder === 'default' && 'bg-accent')}>
+                            Urutan Default
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSortOrder('sales-desc')} className={cn('text-sm', sortOrder === 'sales-desc' && 'bg-accent')}>
+                            Sales Terbanyak Lead
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSortOrder('sales-asc')} className={cn('text-sm', sortOrder === 'sales-asc' && 'bg-accent')}>
+                            Sales Tersedikit Lead
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 {isAnyFilterActive && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={resetFilters}>
                         <X className="h-3.5 w-3.5" />

@@ -259,10 +259,12 @@ export const api = {
     salesRanking(team?: string) {
       return request<{ distribution: any[] }>('GET', `/reports/sales-ranking${team ? `?team=${team}` : ''}`);
     },
-    ocr(params?: { range?: string; team?: string }) {
+    ocr(params?: { range?: string; team?: string; from?: string; to?: string }) {
       const qs = new URLSearchParams();
       if (params?.range) qs.set('range', params.range);
       if (params?.team) qs.set('team', params.team);
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
       const q = qs.toString();
       return request<{ report: any }>('GET', `/reports/ocr${q ? `?${q}` : ''}`);
     },

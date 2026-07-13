@@ -46,3 +46,5 @@ deploy-rules.mjs
 # Gambar test berisi data pribadi asli (jangan ke repo public)
 apps/frontend/public/test-gambar.*
 .vercel
+.claude
+.superpowers

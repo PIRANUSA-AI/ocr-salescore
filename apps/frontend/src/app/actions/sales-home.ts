@@ -1,6 +1,4 @@
-'use server';
-
-import { getAssignedCustomers } from './sales';
+import { api } from '@/lib/api-client';
 import type { Customer, UserProfile } from '@/types';
 import { categorizeLead, comparePriority, isLeadActive, type LeadPriority } from '@/lib/lead-scoring';
 
@@ -27,7 +25,8 @@ export interface SalesHomeData {
 export async function getSalesHome(user: UserProfile): Promise<SalesHomeData> {
     console.log(`[Action: getSalesHome] Sales: ${user.name} (${user.uid})`);
     try {
-        const all = await getAssignedCustomers(user.uid);
+        const { customers } = await api.customers.list({ assignedSalesId: user.uid });
+        const all = customers as Customer[];
         const active = all.filter(isLeadActive);
         const wonCount = all.filter((c) => c.pipelineStatus === 'Won').length;
 

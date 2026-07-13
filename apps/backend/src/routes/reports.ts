@@ -51,8 +51,10 @@ reports.get('/ocr', async (c) => {
   const session = c.get('session');
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
-  const range = (c.req.query('range') || '30d') as 'today' | '7d' | '30d' | 'all';
+  const range = (c.req.query('range') || '30d') as 'today' | 'yesterday' | '7d' | '30d' | 'all' | 'custom';
   const team = (c.req.query('team') || 'all') as 'AEC' | 'MFG' | 'all';
+  const fromParam = c.req.query('from'); // yyyy-mm-dd, dipakai saat range=custom
+  const toParam = c.req.query('to'); // yyyy-mm-dd, dipakai saat range=custom
 
   const conditions = [`acquisition_context->>'source' = 'OCR'`];
   const params: any[] = [];
@@ -91,7 +93,23 @@ reports.get('/ocr', async (c) => {
   const todayStart = startOfJakartaDay(now);
   const todayEnd = endOfJakartaDay(now);
 
-  if (range !== 'all') {
+  if (range === 'custom' && fromParam) {
+    const rangeStart = startOfJakartaDay(new Date(fromParam));
+    const rangeEnd = endOfJakartaDay(new Date(toParam || fromParam));
+    customers = customers.filter((customer) => {
+      const created = jakartaDate(customer.created_at);
+      return created >= rangeStart && created <= rangeEnd;
+    });
+  } else if (range === 'yesterday') {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const rangeStart = startOfJakartaDay(yesterday);
+    const rangeEnd = endOfJakartaDay(yesterday);
+    customers = customers.filter((customer) => {
+      const created = jakartaDate(customer.created_at);
+      return created >= rangeStart && created <= rangeEnd;
+    });
+  } else if (range !== 'all') {
     const rangeStart = startOfJakartaDay(now);
     if (range === '7d') rangeStart.setDate(rangeStart.getDate() - 7);
     if (range === '30d') rangeStart.setDate(rangeStart.getDate() - 30);

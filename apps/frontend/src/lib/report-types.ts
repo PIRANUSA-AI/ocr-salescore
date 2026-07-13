@@ -1,4 +1,4 @@
-export type OcrTimeRange = 'today' | '7d' | '30d' | 'all';
+export type OcrTimeRange = 'today' | 'yesterday' | '7d' | '30d' | 'all' | 'custom';
 export type OcrTeamFilter = 'AEC' | 'MFG' | 'all';
 
 export interface OcrSalesRow {
