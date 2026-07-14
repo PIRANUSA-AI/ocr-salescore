@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { OcrProvider, OcrResult } from './types.js';
 import { buildOcrMessages, extractJsonObject, coerceOcrResult } from './prompt/index.js';
+import type { FormTeam } from './types.js';
 
 export function createOllamaProvider(): OcrProvider {
   const apiKey = process.env.OLLAMA_API_KEY;
@@ -9,12 +10,12 @@ export function createOllamaProvider(): OcrProvider {
 
   return {
     name: `ollama:${model}`,
-    async extract(imageDataUri: string, extraContext?: string): Promise<OcrResult> {
+    async extract(imageDataUri: string, extraContext?: string, team?: FormTeam): Promise<OcrResult> {
       if (!apiKey) {
         throw new Error('OLLAMA_API_KEY belum diset.');
       }
 
-      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri, extraContext);
+      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri, extraContext, team);
 
       const response = await axios.post(
         endpoint,

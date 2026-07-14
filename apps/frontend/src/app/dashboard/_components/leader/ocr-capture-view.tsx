@@ -327,7 +327,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       const compressed = await compressImageToDataUri(dataUri);
       setJobs(prev => prev.map(j => j.id === tempId ? { ...j, status: 'processing' } : j));
       
-      const { job } = await api.ocr.process(compressed);
+      const { job } = await api.ocr.process(compressed, creatorTeam);
       
       setPreviews(prev => ({ ...prev, [job.id]: dataUri }));
       setJobs(prev => prev.map(j => j.id === tempId ? (job as OcrJobData) : j));

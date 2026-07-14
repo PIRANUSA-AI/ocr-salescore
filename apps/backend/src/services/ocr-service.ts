@@ -33,6 +33,7 @@ function optionInText(option: string, text: string): boolean {
 export async function processOcrSync(
   userId: string,
   imageDataUri: string,
+  team: 'AEC' | 'MFG' = 'AEC',
 ): Promise<OcrJob> {
   // buat job record
   const job = await ocrJobRepo.create({ userId });
@@ -60,7 +61,7 @@ export async function processOcrSync(
     const workingImage = await downscaleImage(imageDataUri, 1600);
 
     const { extractCustomer } = await import('../lib/ocr/extract.js');
-    const result = await extractCustomer(workingImage, { alwaysSecondOpinion: false });
+    const result = await extractCustomer(workingImage, { alwaysSecondOpinion: false, team });
     result.imageUrl = imageUrl;
 
     // Step 4: slice-rescan kalau ada SECTION WAJIB yang hilang.
@@ -149,7 +150,7 @@ export async function processOcrSync(
       const sliceResults = await Promise.all(
         slices.map(slice =>
           callOpenAI({
-            systemPrompt: buildSliceFormPrompt(),
+            systemPrompt: buildSliceFormPrompt(team),
             userPrompt: 'Ekstrak form answers dari slice gambar ini.',
             schema: SliceSchema,
             model: process.env.OPENAI_OCR_MODEL || 'gpt-4.1',

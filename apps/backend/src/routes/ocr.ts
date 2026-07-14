@@ -20,10 +20,10 @@ ocr.post('/process', async (c) => {
   const session: SessionPayload | null = c.get('session');
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
-  const { imageDataUri } = await c.req.json<{ imageDataUri: string }>();
+  const { imageDataUri, team } = await c.req.json<{ imageDataUri: string; team?: 'AEC' | 'MFG' }>();
   if (!imageDataUri) return c.json({ error: 'imageDataUri required' }, 400);
 
-  const job = await processOcrSync(session.uid, imageDataUri);
+  const job = await processOcrSync(session.uid, imageDataUri, team === 'MFG' ? 'MFG' : 'AEC');
   return c.json({ job }, job.status === 'done' ? 200 : 202);
 });
 

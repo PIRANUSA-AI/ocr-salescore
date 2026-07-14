@@ -45,9 +45,11 @@ export const OCR_FIELD_LABELS: Record<string, string> = {
   address: 'Alamat',
 };
 
+export type FormTeam = 'AEC' | 'MFG';
+
 export interface OcrProvider {
   name: string;
-  extract(imageDataUri: string, extraContext?: string): Promise<OcrResult>;
+  extract(imageDataUri: string, extraContext?: string, team?: FormTeam): Promise<OcrResult>;
 }
 
 export const VALID_CONFIDENCE: Confidence[] = ['high', 'medium', 'low', 'empty'];

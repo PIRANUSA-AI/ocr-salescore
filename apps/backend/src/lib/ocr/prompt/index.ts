@@ -3,6 +3,7 @@ import { buildSystemPrompt } from './system.js';
 import { buildLogicPrompt } from './logic.js';
 import { buildGuardrailPrompt } from './guardrails.js';
 import { buildUserPrompt } from './template.js';
+import type { FormTeam } from '../types.js';
 import { buildVerifierSystemPrompt, buildVerifierUserPrompt } from './verifier.js';
 import { VALID_CONFIDENCE, OCR_FIELDS, type OcrResult, type OcrField, type FormAnswer, type Confidence } from '../types.js';
 
@@ -14,14 +15,14 @@ ${buildLogicPrompt()}
 ${buildGuardrailPrompt()}`;
 }
 
-export function buildOcrUserPrompt(imageDataUri: string, extraContext?: string): string {
-  return buildUserPrompt(imageDataUri, extraContext);
+export function buildOcrUserPrompt(imageDataUri: string, extraContext?: string, team?: FormTeam): string {
+  return buildUserPrompt(imageDataUri, extraContext, team);
 }
 
-export function buildOcrMessages(imageDataUri: string, extraContext?: string) {
+export function buildOcrMessages(imageDataUri: string, extraContext?: string, team?: FormTeam) {
   return {
     systemPrompt: buildOcrSystemPrompt(),
-    userPrompt: buildOcrUserPrompt(imageDataUri, extraContext),
+    userPrompt: buildOcrUserPrompt(imageDataUri, extraContext, team),
     imageDataUri,
   };
 }

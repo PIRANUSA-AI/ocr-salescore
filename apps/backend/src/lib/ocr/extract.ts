@@ -1,7 +1,7 @@
 import { callOpenAI } from '../openai-client.js';
 import { createOpenAIProvider } from './openai-provider.js';
 import { createOllamaProvider } from './ollama-provider.js';
-import { OCR_FIELDS, type Confidence, type OcrField, type OcrResult } from './types.js';
+import { OCR_FIELDS, type Confidence, type FormTeam, type OcrField, type OcrResult } from './types.js';
 import { buildVerifierSystemPrompt, buildVerifierUserPrompt, OcrResultSchema, coerceOcrResult } from './prompt/index.js';
 import { buildIdentityReviewSystemPrompt, buildIdentityReviewUserPrompt } from './prompt/identity-review.js';
 import {
@@ -22,6 +22,8 @@ export interface ExtractOptions {
   alwaysSecondOpinion?: boolean;
   skipIdentityReview?: boolean;
   skipVerifier?: boolean;
+  /** Varian form (menentukan opsi checkbox mana yang di-inject ke prompt). */
+  team?: FormTeam;
 }
 
 export interface ExtractResult extends Omit<OcrResult, 'formAnswers'> {
@@ -47,10 +49,11 @@ export async function extractCustomer(
 ): Promise<ExtractResult> {
   const start = Date.now();
   const uncertain = options.uncertainLevels ?? DEFAULT_UNCERTAIN;
+  const team = options.team ?? 'AEC';
   const primary = createOpenAIProvider();
 
   // Stage 1: Direct full-page OCR remains the baseline.
-  const base = await primary.extract(imageDataUri);
+  const base = await primary.extract(imageDataUri, undefined, team);
 
   const scalarFields = OCR_SCALAR_FIELDS;
   const uncertainFields = scalarFields.filter((f) => uncertain.includes(base[f].confidence));
@@ -177,7 +180,7 @@ export async function extractCustomer(
   if (needFallback && process.env.OLLAMA_ENDPOINT) {
     try {
       const fallback = createOllamaProvider();
-      const second = await fallback.extract(imageDataUri);
+      const second = await fallback.extract(imageDataUri, undefined, team);
       result.fallbackProvider = fallback.name;
 
       for (const field of uncertainFields) {

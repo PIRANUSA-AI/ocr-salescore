@@ -1,10 +1,54 @@
-import { OCR_FIELDS, OCR_FIELD_LABELS } from '../types.js';
+import { OCR_FIELDS, OCR_FIELD_LABELS, type FormTeam } from '../types.js';
+
+export type { FormTeam };
+
+/**
+ * Opsi checkbox yang benar-benar tercetak per varian form. Mirror dari
+ * TEAM_FORM_OPTIONS di frontend (ocr-capture-view). Prompt HANYA diberi opsi
+ * team yang relevan — model kecil (gpt-4o-mini) tidak perlu memilih antara dua
+ * varian sekaligus, jadi lebih fokus dan tidak salah kolom.
+ */
+const FORM_OPTIONS: Record<FormTeam, {
+  industri: string[];
+  produk: string[];
+  software: string[];
+  tindakLanjut: string[];
+}> = {
+  AEC: {
+    industri: ['Arsitek', 'Interior Design', 'Kontraktor', 'Developer', 'Lainnya'],
+    produk: ['ZWCAD', 'SketchUp', 'Archicad', 'Rendering', 'Lainnya'],
+    software: ['AutoCAD', 'SketchUp', 'Revit', 'Archicad', 'ZWCAD', 'Lainnya'],
+    tindakLanjut: ['Demo', 'Penawaran', 'Kunjungan', 'Follow-up Call'],
+  },
+  MFG: {
+    industri: ['Otomotif & Komponen', 'Elektronik & Elektrikal', 'Logam & Fabrikasi', 'Alat Berat & Machinery', 'Plastik, Kimia & Kemasan', 'Lainnya'],
+    produk: ['ZWCAD', 'ZW3D', 'SketchUp', 'ANSYS', '3D Scanner', 'Lainnya'],
+    software: ['AutoCAD', 'SolidWorks', 'Autodesk Inventor/Fusion 360', 'ANSYS', 'ZWCAD/ZW3D/SketchUp', 'Lainnya'],
+    tindakLanjut: ['Demo', 'Trial/POC', 'Penawaran', 'Kunjungan', 'Follow-up Call'],
+  },
+};
 
 export function buildFieldList(): string {
   return OCR_FIELDS
     .filter((f) => f !== 'formAnswers')
     .map((f) => `${f} (${OCR_FIELD_LABELS[f]})`)
     .join(', ');
+}
+
+/**
+ * Daftar pertanyaan form untuk satu team saja. Satu baris per section, opsi
+ * dari varian yang benar. Section yang sama di kedua varian (Rencana, Skor,
+ * Catatan) ditulis sekali.
+ */
+function buildFormQuestions(team: FormTeam): string {
+  const o = FORM_OPTIONS[team];
+  return `- "Industri" → cari centang pada: ${o.industri.join(', ')}
+- "Produk yang diminati" / "Produk" → cari centang pada: ${o.produk.join(', ')}
+- "Software yang digunakan" / "Software saat ini" → cari centang pada: ${o.software.join(', ')}
+- "Rencana pembelian" / "Kapan" → cari centang pada: <3 bulan, 3-6 bulan, >6 bulan, Belum ada
+- "Tindak lanjut" / "Follow up" → cari centang pada: ${o.tindakLanjut.join(', ')}
+- "Skor" → cari centang pada: High, Medium, Low
+- "Catatan" / "Kendala" / "Notes" → transkripsikan tulisan tangan apa adanya`;
 }
 
 export function buildExampleOutput(): string {
@@ -23,12 +67,13 @@ export function buildExampleOutput(): string {
     {"question": "Software yang digunakan saat ini", "answer": "AutoCAD"},
     {"question": "Kapan rencana pembelian", "answer": "3-6 bulan"},
     {"question": "Tindak lanjut", "answer": "Demo"},
-    {"question": "Skor", "answer": "High"}
+    {"question": "Skor", "answer": "High"},
+    {"question": "Catatan", "answer": "Minta demo minggu depan"}
   ]
 }`;
 }
 
-export function buildUserPrompt(imageDataUri: string, extraContext?: string): string {
+export function buildUserPrompt(imageDataUri: string, extraContext?: string, team: FormTeam = 'AEC'): string {
   let prompt = `Analisis gambar KARTU NAMA / FORM CUSTOMER ini dengan saksama.
 
 Field yang harus diekstrak: ${buildFieldList()}.
@@ -51,43 +96,16 @@ ATURAN EVIDENCE:
 1. Ekstrak data dari KARTU NAMA (name, company, jobTitle, phone, email, address).
 2. Cari FORM / CHECKLIST di sekitar gambar. Jika ada kotak centang (checkbox) atau pertanyaan dengan tulisan tangan, ekstrak sebagai formAnswers.
 
-⚠️ PISAHKAN IDENTITAS DARI FIELD FORM (SANGAT PENTING):
-Field identitas (name, company, jobTitle, phone, email, address) HANYA diambil dari teks yang berada tepat di area kartu nama / baris berlabel (Nama, Perusahaan, Jabatan, Telepon, Email).
-- JANGAN mengambil label section form ("Tim", "MFG", "Manufacturing", "Sales", "Event", "Industri") sebagai jabatan/jobTitle. Itu bagian form, BUKAN jabatan orang.
-- Contoh SALAH: jobTitle = "Manufacturing" atau "MFG" — itu nama tim di form, bukan jabatan.
-- Jika baris "Jabatan" pada kartu KOSONG, isi jobTitle = "" confidence "empty". JANGAN tebak dari teks di sekitarnya.
-- "Tim" (MFG/AEC), "Event", "Sales" adalah metadata form → kalau perlu, simpan sebagai formAnswers, JANGAN sebagai field identitas.
+⚠️ CHECKBOX: Sales mencentang cepat dan sering meleset. Jika coretan mengenai atau berjarak ≤3mm dari sebuah checkbox, anggap dicentang. Jika centang di antara dua kotak, pilih yang paling dekat. Cocokkan centang HANYA dengan label tepat di sebelahnya — jangan geser ke baris atas/bawah.
 
-⚠️ ATURAN KHUSUS CHECKBOX (CENTANG):
-Sales sering mencentang TIDAK TEPAT di dalam kotak — centang bisa meleset ke luar kotak, mengenai pilihan lain, atau coret asal-asalan.
-- Jika ada coretan/centang yang mengenai atau berjarak ≤3mm dari sebuah checkbox, ANGGAP checkbox itu dicentang.
-- Jika centang berada DI ANTARA dua checkbox (mengenai keduanya), pilih yang paling mungkin berdasarkan posisi mayoritas coretan.
-- Jika centang meleset ke baris di atas/bawah tapi arah coretan jelas menuju satu kotak, ikuti arah coretan.
-- JANGAN ragu hanya karena centang tidak rapi. Sales di exhibition mencentang cepat dan asal.
+⚠️ CATATAN TANGAN (WAJIB dicari): Kolom "Catatan"/"Kendala"/"Notes" ditulis sales cepat dan bisa jelek. Transkripsikan APA ADANYA — jangan perbaiki ejaan, jangan tebak. Jika ada tulisan tangan sama sekali, WAJIB masukkan ke formAnswers sebagai {"question": "Catatan", "answer": "..."}. Jika tak terbaca, tulis answer "Tidak terbaca".
 
-⚠️ ATURAN KHUSUS FORM MFG (JIKA FORM BER-LAYOUT 2 KOLOM):
-Form MFG menyusun opsi dalam DUA KOLOM (kiri & kanan) dengan label panjang. Ini rawan salah baca baris/kolom.
-- Baca SETIAP checkbox pada kotaknya sendiri. Cocokkan tanda centang HANYA dengan label yang tepat berada di sebelah kanan kotak itu — jangan geser ke label baris atas/bawah atau kolom seberang.
-- "Industri" dua kolom: kolom kiri (Otomotif & Komponen, Logam & Fabrikasi, Plastik/Kimia & Kemasan) vs kolom kanan (Elektronik & Elektrikal, Alat Berat & Machinery, Lainnya). Pastikan kotak yang dicentang sejajar horizontal dengan label yang kamu pilih.
-- Section "Software yang digunakan saat ini" ADA DAN TERPISAH dari "Produk yang diminati". Jangan lewati section Software — periksa tiap opsinya (AutoCAD, SolidWorks, Autodesk Inventor/Fusion 360, ANSYS/software simulasi lain, ZWCAD/ZW3D/SketchUp). Jawaban Produk TIDAK otomatis mengisi Software; keduanya dibaca terpisah.
-- PRESISI > menebak: untuk form MFG, hanya tandai checkbox yang kotaknya BENAR-BENAR terisi/tercoret. Jika ragu, JANGAN tambahkan opsi ekstra. Lebih baik satu centang yang benar daripada dua centang di mana satu salah.
+⚠️ IDENTITAS ≠ FORM: Field identitas (name, company, jobTitle, phone, email, address) HANYA dari area kartu nama / baris berlabel. JANGAN ambil label form ("Tim", "MFG", "Sales", "Event", "Industri") sebagai jobTitle. Jika baris "Jabatan" kosong, isi jobTitle "" confidence "empty" — jangan tebak.
 
-⚠️ ATURAN KHUSUS CATATAN TANGAN:
-- Kolom "Catatan" / "Kendala" / "Notes" ditulis sales dalam hitungan detik — tulisannya bisa jelek, acak, atau tercampur.
-- Transkripsikan APA ADANYA persis seperti yang tertulis. Jangan memperbaiki ejaan, jangan menebak kata yang tidak jelas.
-- Jika tidak terbaca sama sekali, tulis "Tidak terbaca" sebagai answer.
+SALES CODE: Inisial sales tulisan tangan (LN, LS, NU, RU, TK, TA, BR, RQ) jika berdiri sendiri → simpan sebagai formAnswers {"question": "Sales code", "answer": "<inisial>"}.
 
-SALES CODE / INITIALS: Di form mungkin ada inisial sales yang ditulis tangan seperti LN, LS, NU, RU, TK, TA, BR, RQ. Jika inisial ditemukan sebagai teks terpisah (bukan bagian dari kata panjang), simpan sebagai formAnswers dengan question: "Sales code".
-
-PERTANYAAN YANG SERING MUNCUL DI FORM (cari dan ekstrak):
-Ada dua varian form yang beredar (AEC dan MFG) — cocokkan dengan pilihan yang BENAR-BENAR TERCETAK di gambar, jangan paksa ke varian yang salah.
-- "Industri" → varian AEC: Arsitek, Interior Design, Kontraktor, Developer, Lainnya. Varian MFG: Otomotif & Komponen, Elektronik & Elektrikal, Logam & Fabrikasi, Alat Berat & Machinery, Plastik/Kimia & Kemasan, Lainnya
-- "Produk yang diminati" / "Produk" → varian AEC: ZWCAD, SketchUp, Archicad, Rendering, Lainnya. Varian MFG (terbagi Software / Hardware): Software = ZWCAD (2D/3D CAD), ZW3D (Desain 3D & CAM), SketchUp, ANSYS (Simulasi/CAE); Hardware = 3D Scanner (Scanology/Shining), Lainnya. UNTUK FORM MFG: tulis nama produk kanonik apa adanya (ZWCAD, ZW3D, SketchUp, ANSYS, 3D Scanner) — jangan disingkat atau diparafrase.
-- "Software yang digunakan" / "Software saat ini" → varian AEC: AutoCAD, SketchUp, Revit, Archicad, ZWCAD, Lainnya. Varian MFG: AutoCAD, SolidWorks, Autodesk Inventor/Fusion 360, ANSYS/software simulasi lain, ZWCAD/ZW3D/SketchUp, Lainnya. UNTUK FORM MFG: tulis nama software kanonik apa adanya (AutoCAD, SolidWorks, Inventor, Fusion 360, ANSYS) — jangan disingkat atau diparafrase.
-- "Rencana pembelian" / "Kapan" → cari centang pada: <3 bulan, 3-6 bulan, >6 bulan, Belum ada (sama di kedua varian)
-- "Tindak lanjut" / "Follow up" → varian AEC: Demo, Penawaran, Kunjungan, Follow-up Call. Varian MFG: Demo, Trial/POC, Penawaran, Kunjungan, Follow-up Call. UNTUK FORM MFG: tulis pilihan kanonik apa adanya (Demo, Trial, POC, Penawaran, Kunjungan, Follow-up Call) — jangan disingkat atau diparafrase.
-- "Skor" → cari centang pada: High, Medium, Low (sama di kedua varian)
-- "Catatan" / "Kendala" / "Notes" → transkripsikan tulisan tangan apa adanya
+PERTANYAAN FORM (varian ${team}) — cari dan ekstrak:
+${buildFormQuestions(team)}
 
 Jika tidak menemukan form, formAnswers boleh dikosongkan.
 
@@ -100,7 +118,7 @@ WAJIB: Gunakan nilai confidence yang jujur. Jangan menebak.`;
   return prompt;
 }
 
-export function buildSliceFormPrompt(): string {
+export function buildSliceFormPrompt(team: FormTeam = 'AEC'): string {
   return `Anda melihat sepotong (slice) dari form customer PT PIRANUSA.
 Tugas Anda: deteksi apakah ada pertanyaan form, checkbox, atau tulisan tangan di gambar ini.
 
@@ -108,20 +126,14 @@ Jika ADA pertanyaan form, ekstrak sebagai array formAnswers — setiap entri har
 - "question": teks pertanyaan persis seperti yang tercetak
 - "answer": jawaban (centang / tulisan tangan)
 
-⚠️ ATURAN CHECKBOX: Sales mencentang cepat dan sering meleset. Jika coretan mengenai atau berjarak ≤3mm dari checkbox, anggap dicentang. Jika di antara dua opsi, pilih yang paling mendekati.
+⚠️ CHECKBOX: Sales mencentang cepat dan sering meleset. Jika coretan mengenai atau berjarak ≤3mm dari checkbox, anggap dicentang. Jika di antara dua opsi, pilih yang paling dekat.
 
-⚠️ ATURAN CATATAN: Tulisan tangan sales bisa jelek dan acak. Transkripsikan apa adanya, jangan diperbaiki.
+⚠️ CATATAN: Tulisan tangan sales bisa jelek dan acak. Transkripsikan apa adanya, jangan diperbaiki.
 
 SALES INITIALS: Cari inisial sales (LN, LS, NU, RU, TK, TA, BR, RQ) yang ditulis tangan sebagai teks terpisah — simpan sebagai {"question": "Sales code", "answer": "<inisial>"}.
 
-Ada dua varian form (AEC dan MFG) — cocokkan dengan pilihan yang tercetak di gambar, jangan paksa ke varian yang salah.
-- "Industri" → AEC: Arsitek, Interior Design, Kontraktor, Developer, Lainnya. MFG: Otomotif & Komponen, Elektronik & Elektrikal, Logam & Fabrikasi, Alat Berat & Machinery, Plastik/Kimia & Kemasan, Lainnya
-- "Produk yang diminati" → AEC: ZWCAD, SketchUp, Archicad, Rendering, Lainnya. MFG (Software/Hardware): ZWCAD (2D/3D CAD), ZW3D (Desain 3D & CAM), SketchUp, ANSYS (Simulasi/CAE), 3D Scanner (Scanology/Shining), Lainnya
-- "Software yang digunakan saat ini" → AEC: AutoCAD, SketchUp, Revit, Archicad, ZWCAD, Lainnya. MFG: AutoCAD, SolidWorks, Autodesk Inventor/Fusion 360, ANSYS/software simulasi lain, ZWCAD/ZW3D/SketchUp, Lainnya
-- "Rencana pembelian" → cari centang pada <3, 3-6, >6, Belum ada
-- "Tindak lanjut" → AEC: Demo, Penawaran, Kunjungan, Follow-up Call. MFG: Demo, Trial/POC, Penawaran, Kunjungan, Follow-up Call
-- "Skor" → cari centang pada High, Medium, Low
-- "Catatan" / "Kendala" → transkripsikan tulisan tangan apa adanya
+PERTANYAAN FORM (varian ${team}):
+${buildFormQuestions(team)}
 
 Jika TIDAK ADA pertanyaan form di slice ini, kembalikan formAnswers: [].
 

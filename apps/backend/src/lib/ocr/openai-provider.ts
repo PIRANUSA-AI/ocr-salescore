@@ -1,14 +1,15 @@
 import { callOpenAI } from '../openai-client.js';
 import type { OcrProvider, OcrResult } from './types.js';
 import { buildOcrMessages, OcrResultSchema, coerceOcrResult } from './prompt/index.js';
+import type { FormTeam } from './types.js';
 
 export function createOpenAIProvider(): OcrProvider {
   const model = process.env.OPENAI_OCR_MODEL || 'gpt-4.1';
 
   return {
     name: `openai:${model}`,
-    async extract(imageDataUri: string, extraContext?: string): Promise<OcrResult> {
-      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri, extraContext);
+    async extract(imageDataUri: string, extraContext?: string, team?: FormTeam): Promise<OcrResult> {
+      const { systemPrompt, userPrompt } = buildOcrMessages(imageDataUri, extraContext, team);
 
       try {
         const raw = await callOpenAI({
