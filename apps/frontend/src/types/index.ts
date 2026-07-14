@@ -32,6 +32,21 @@ export const CUSTOMER_SOURCES = [
     'Webinar', 'Excel', 'OCR', 'Reply Assistant', 'Pameran', 'Workshop', 'Visit', 'Training', 'Troubleshoot', 'Telepon Masuk', 'Rekomendasi', 'Lainnya'
 ] as const;
 
+export const DEFAULT_EVENT_BY_TEAM: Record<'AEC' | 'MFG', string> = {
+    AEC: 'IBT 2026',
+    MFG: 'Manufacturing Surabaya 2026',
+};
+
+export const EVENT_OPTIONS = [
+    'IBT 2026',
+    'Manufacturing Surabaya 2026',
+] as const;
+
+export const EVENT_TO_TEAM: Record<string, 'AEC' | 'MFG'> = {
+    [DEFAULT_EVENT_BY_TEAM.AEC]: 'AEC',
+    [DEFAULT_EVENT_BY_TEAM.MFG]: 'MFG',
+};
+
 export type CustomerSource = (typeof CUSTOMER_SOURCES)[number];
 
 

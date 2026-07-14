@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM } from '@/types';
 
 const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
@@ -49,8 +50,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     const [fields, setFields] = useState<Record<string, string>>({});
     const [formAnswers, setFormAnswers] = useState<{ question: string; answer: string }[]>([]);
     const [salesCode, setSalesCode] = useState<string>('');
-    const [eventName, setEventName] = useState('IBT 2026');
-    const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
+    const [eventName, setEventName] = useState(DEFAULT_EVENT_BY_TEAM.MFG);
+    const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('MFG');
     const [readingStep, setReadingStep] = useState(0);
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
@@ -73,8 +74,8 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
         setFields({});
         setFormAnswers([]);
         setSalesCode('');
-        setEventName('IBT 2026');
-        setCreatorTeam('AEC');
+        setEventName(DEFAULT_EVENT_BY_TEAM.MFG);
+        setCreatorTeam('MFG');
         setReadingStep(0);
         setHasCameraPermission(null);
         stopCamera();
@@ -338,7 +339,10 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                             {/* Pilih Tim yang sebelumnya hanya ada di dashboard userProfile */}
                             <div className="flex flex-col gap-1.5 p-3 border rounded-md bg-muted/20">
                                 <Label htmlFor="creatorTeam">Tim Pengguna <span className="text-red-500">*</span></Label>
-                                <Select value={creatorTeam} onValueChange={(val: any) => setCreatorTeam(val)} disabled={status === 'saving'}>
+                                <Select value={creatorTeam} onValueChange={(val: any) => {
+                                    setCreatorTeam(val);
+                                    setSalesCode('');
+                                }} disabled={status === 'saving'}>
                                     <SelectTrigger id="creatorTeam">
                                         <SelectValue placeholder="Pilih tim..." />
                                     </SelectTrigger>
@@ -354,7 +358,21 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="eventName">Nama Event / Acara <span className="text-red-500">*</span></Label>
-                                <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Contoh: Pameran MFI 2026" disabled={status === 'saving'} />
+                                <Select value={eventName} onValueChange={(val) => {
+                                    setEventName(val);
+                                    const team = EVENT_TO_TEAM[val];
+                                    if (team) {
+                                        setCreatorTeam(team);
+                                        setSalesCode('');
+                                    }
+                                }} disabled={status === 'saving'}>
+                                    <SelectTrigger id="eventName"><SelectValue placeholder="Pilih event..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {EVENT_OPTIONS.map((e) => (
+                                            <SelectItem key={e} value={e}>{e}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             <div className="flex flex-col gap-1.5">

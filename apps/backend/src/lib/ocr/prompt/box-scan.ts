@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { OCR_FIELDS, VALID_CONFIDENCE, type Confidence } from '../types.js';
 
-const BoxFieldSchema = z.enum(['name', 'company', 'jobTitle', 'division', 'phone', 'email', 'softwareNeeds', 'formAnswer', 'unknown']);
+const KNOWN_BOX_FIELDS = ['name', 'company', 'jobTitle', 'division', 'phone', 'email', 'address', 'softwareNeeds', 'formAnswer', 'unknown'] as const;
+// Model kadang balikin field di luar enum (mis. 'address', 'website') — apalagi
+// dengan detail:high yang bikin output lebih kaya. Jangan crash seluruh box-scan;
+// petakan nilai tak dikenal ke 'unknown' supaya box lain tetap terpakai.
+const BoxFieldSchema = z.preprocess(
+  (v) => (typeof v === 'string' && (KNOWN_BOX_FIELDS as readonly string[]).includes(v) ? v : 'unknown'),
+  z.enum(KNOWN_BOX_FIELDS),
+);
 
 export const BoxScanSchema = z.object({
   pageType: z.enum(['form', 'business_card', 'unknown']),
@@ -51,7 +58,7 @@ Kembalikan JSON:
   "pageType": "form" | "business_card" | "unknown",
   "boxes": [
     {
-      "field": "name" | "company" | "jobTitle" | "division" | "phone" | "email" | "softwareNeeds" | "formAnswer" | "unknown",
+      "field": "name" | "company" | "jobTitle" | "division" | "phone" | "email" | "address" | "softwareNeeds" | "formAnswer" | "unknown",
       "label": "label yang terlihat",
       "region": "posisi kotak/area",
       "rawText": "transkripsi mentah",
@@ -67,7 +74,7 @@ export function coerceBoxScanResult(raw: RawBoxScanResult): BoxScanResult {
   return {
     pageType: raw.pageType || 'unknown',
     boxes: (raw.boxes || []).map((box) => ({
-      field: box.field || 'unknown',
+      field: (typeof box.field === 'string' && (KNOWN_BOX_FIELDS as readonly string[]).includes(box.field) ? box.field : 'unknown') as BoxScanResult['boxes'][number]['field'],
       label: String(box.label || '').trim(),
       region: String(box.region || '').trim(),
       rawText: String(box.rawText || '').trim(),

@@ -69,5 +69,13 @@ LANGKAH 6 — CONFIDENCE:
 - high: teks sangat jelas terbaca dan lolos validasi format
 - medium: terbaca tapi ada keraguan kecil, atau format tidak sempurna
 - low: sulit terbaca, atau tidak lolos guardrails
-- empty: field tidak ada di gambar sama sekali`;
+- empty: field tidak ada di gambar sama sekali
+
+LANGKAH 7 — DATA KONTAK TULISAN TANGAN (PENTING):
+Kontak (name, phone, email, company) bisa berasal dari KARTU NAMA CETAK atau dari STIKER/KOLOM yang DIISI TULISAN TANGAN.
+- Jika sumbernya CETAK (font rapi, kontras tinggi) → boleh confidence "high".
+- Jika sumbernya TULISAN TANGAN (huruf/angka ditulis pena, miring, menyambung) → JANGAN beri "high". Maksimal "medium", dan "low" jika ada digit/huruf yang ambigu.
+- PHONE tulisan tangan: angka seperti 1/7, 4/9, 0/6, 3/8, 5/6 sering rancu. Jika ragu pada digit tertentu, turunkan confidence dan berikan bacaan alternatif di alternatives (mis. value "0812..." dengan alternatives varian digit yang ragu).
+- EMAIL tulisan tangan: jika ada huruf yang ragu, turunkan confidence; jangan memaksa "high".
+- Tujuannya: field kontak tulisan tangan yang ragu HARUS terlihat perlu dicek manual, bukan tampak pasti benar.`;
 }

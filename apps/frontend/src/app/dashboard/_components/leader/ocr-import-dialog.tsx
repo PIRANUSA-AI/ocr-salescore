@@ -18,6 +18,7 @@ import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM } from '@/types';
 
 function matchOptions(answer: string, options: readonly string[]): { matched: string[]; other: string } {
   if (!answer) return { matched: [], other: '' };
@@ -35,11 +36,35 @@ function matchOptions(answer: string, options: readonly string[]): { matched: st
   return { matched: [...new Set(matched)], other };
 }
 
-const INDUSTRI_OPTIONS = ['Arsitek', 'Interior Design', 'Kontraktor', 'Developer'] as const;
-const PRODUCT_INTEREST = ['ZWCAD', 'SketchUp', 'Archicad', 'Rendering'] as const;
-const SOFTWARE_OPTIONS = ['AutoCAD', 'SketchUp', 'Revit', 'Archicad', 'ZWCAD'] as const;
+type ProductGroup = { label: string | null; options: readonly string[] };
+type TeamFormOptions = {
+  industri: readonly string[];
+  productGroups: readonly ProductGroup[];
+  software: readonly string[];
+  followUp: readonly string[];
+};
+
+const TEAM_FORM_OPTIONS: Record<'AEC' | 'MFG', TeamFormOptions> = {
+  AEC: {
+    industri: ['Arsitek', 'Interior Design', 'Kontraktor', 'Developer'],
+    productGroups: [
+      { label: null, options: ['ZWCAD', 'SketchUp', 'Archicad', 'Rendering'] },
+    ],
+    software: ['AutoCAD', 'SketchUp', 'Revit', 'Archicad', 'ZWCAD'],
+    followUp: ['Demo', 'Penawaran', 'Kunjungan', 'Follow-up Call'],
+  },
+  MFG: {
+    industri: ['Otomotif & Komponen', 'Elektronik & Elektrikal', 'Logam & Fabrikasi', 'Alat Berat & Machinery', 'Plastik, Kimia & Kemasan'],
+    productGroups: [
+      { label: 'Software', options: ['ZWCAD (2D/3D CAD)', 'ZW3D (Desain 3D & CAM)', 'SketchUp', 'ANSYS (Simulasi/CAE)'] },
+      { label: 'Hardware', options: ['3D Scanner (Scanology/Shining)'] },
+    ],
+    software: ['AutoCAD', 'SolidWorks', 'Autodesk Inventor/Fusion 360', 'ANSYS/software simulasi lain', 'ZWCAD/ZW3D/SketchUp'],
+    followUp: ['Demo', 'Trial/POC', 'Penawaran', 'Kunjungan', 'Follow-up Call'],
+  },
+};
+
 const TIMELINE_OPTIONS = ['< 3 bulan', '3–6 bulan', '> 6 bulan', 'Belum ada'] as const;
-const FOLLOWUP_OPTIONS = ['Demo', 'Penawaran', 'Kunjungan', 'Follow-up Call'] as const;
 const SKOR_OPTIONS = ['High', 'Medium', 'Low'] as const;
 
 const READING_STEPS = [
@@ -85,14 +110,21 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
   const [salesNotes, setSalesNotes] = useState('');
 
   const [salesCode, setSalesCode] = useState('');
-  const [eventName, setEventName] = useState('IBT 2026');
+  const [eventName, setEventName] = useState(DEFAULT_EVENT_BY_TEAM.AEC);
   const [readingStep, setReadingStep] = useState(0);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
 
+  const formOptions = TEAM_FORM_OPTIONS[creatorTeam];
+  const productOptionsFlat = useMemo(
+    () => formOptions.productGroups.flatMap(g => g.options),
+    [formOptions]
+  );
+
   useEffect(() => {
     if (userProfile?.team) {
       setCreatorTeam(userProfile.team);
+      setEventName(DEFAULT_EVENT_BY_TEAM[userProfile.team]);
     }
   }, [userProfile]);
 
@@ -124,7 +156,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
     setSkor('');
     setSalesNotes('');
     setSalesCode('');
-    setEventName('IBT 2026');
+    setEventName(DEFAULT_EVENT_BY_TEAM[userProfile?.team || 'AEC']);
     setCreatorTeam(userProfile?.team || 'AEC');
     setReadingStep(0);
     setHasCameraPermission(null);
@@ -204,20 +236,20 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
       };
 
       const indQ = byQuestion(['industri']);
-      const indA = byAnswer(INDUSTRI_OPTIONS);
-      const ind = matchOptions(indQ || indA.join(', '), INDUSTRI_OPTIONS);
+      const indA = byAnswer(formOptions.industri);
+      const ind = matchOptions(indQ || indA.join(', '), formOptions.industri);
       setIndustri(ind.matched.length > 0 ? ind.matched : indA);
       if (ind.other) setOtherIndustri(ind.other);
 
       const piQ = byQuestion(['produk', 'minat']);
-      const piA = byAnswer(PRODUCT_INTEREST);
-      const pi = matchOptions(piQ || piA.join(', ') || res.softwareNeeds.value, PRODUCT_INTEREST);
+      const piA = byAnswer(productOptionsFlat);
+      const pi = matchOptions(piQ || piA.join(', ') || res.softwareNeeds.value, productOptionsFlat);
       setProductInterest(pi.matched.length > 0 ? pi.matched : piA);
       if (pi.other) setOtherProduct(pi.other);
 
       const swQ = byQuestion(['software', 'saat ini', 'digunakan']);
-      const swA = byAnswer(SOFTWARE_OPTIONS);
-      const sw = matchOptions(swQ || swA.join(', ') || res.softwareNeeds.value, SOFTWARE_OPTIONS);
+      const swA = byAnswer(formOptions.software);
+      const sw = matchOptions(swQ || swA.join(', ') || res.softwareNeeds.value, formOptions.software);
       setCurrentSoftware(sw.matched.length > 0 ? sw.matched : swA);
       if (sw.other) setOtherSoftware(sw.other);
 
@@ -241,14 +273,14 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
       const fu = byQuestion(['tindak', 'follow', 'lanjut']);
       const fuMatches: string[] = [];
       if (fu) {
-        for (const o of FOLLOWUP_OPTIONS) {
+        for (const o of formOptions.followUp) {
           if (fu.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(fu.toLowerCase())) {
             fuMatches.push(o);
           }
         }
       } else {
         for (const f of fa) {
-          for (const o of FOLLOWUP_OPTIONS) {
+          for (const o of formOptions.followUp) {
             if (f.answer.toLowerCase().includes(o.toLowerCase()) || o.toLowerCase().includes(f.answer.toLowerCase())) {
               fuMatches.push(o);
             }
@@ -539,9 +571,31 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
               <p className="text-xs text-muted-foreground">Beberapa field diverifikasi ulang oleh AI.</p>
             )}
 
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="eventName">Event <span className="text-red-500">*</span></Label>
+              <Select value={eventName} onValueChange={(val) => {
+                setEventName(val);
+                const team = EVENT_TO_TEAM[val];
+                if (team) {
+                  setCreatorTeam(team);
+                  setSalesCode('');
+                }
+              }} disabled={status === 'saving'}>
+                <SelectTrigger id="eventName"><SelectValue placeholder="Pilih event..." /></SelectTrigger>
+                <SelectContent>
+                  {EVENT_OPTIONS.map((e) => (
+                    <SelectItem key={e} value={e}>{e}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="flex flex-col gap-1.5 p-3 border rounded-md bg-muted/20">
               <Label htmlFor="creatorTeam">Tim</Label>
-              <Select value={creatorTeam} onValueChange={(val: any) => setCreatorTeam(val)} disabled={status === 'saving'}>
+              <Select value={creatorTeam} onValueChange={(val: any) => {
+                setCreatorTeam(val);
+                setSalesCode('');
+              }} disabled={status === 'saving'}>
                 <SelectTrigger id="creatorTeam">
                   <SelectValue placeholder="Pilih tim..." />
                 </SelectTrigger>
@@ -550,11 +604,6 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                   <SelectItem value="MFG">MFG (Manufacturing)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="eventName">Event <span className="text-red-500">*</span></Label>
-              <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Contoh: IBT 2026" disabled={status === 'saving'} />
             </div>
 
               <div className="flex flex-col gap-1.5">
@@ -572,7 +621,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
               <div className="space-y-2">
                 <Label>Industri</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {INDUSTRI_OPTIONS.map((i) => (
+                  {formOptions.industri.map((i) => (
                     <label key={i} className="flex items-center gap-2 cursor-pointer">
                       <Checkbox checked={industri.includes(i)} onCheckedChange={(checked) => setIndustri(prev => checked ? [...prev, i] : prev.filter(x => x !== i))} />
                       <span className="text-sm font-normal">{i}</span>
@@ -590,18 +639,23 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
               <div className="space-y-2">
                 <Label>Produk yang diminati</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {PRODUCT_INTEREST.map((p) => (
-                    <label key={p} className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox checked={productInterest.includes(p)} onCheckedChange={(checked) => setProductInterest(prev => checked ? [...prev, p] : prev.filter(x => x !== p))} />
-                      <span className="text-sm font-normal">{p}</span>
-                    </label>
-                  ))}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox checked={productInterest.includes('Lainnya')} onCheckedChange={(checked) => setProductInterest(prev => checked ? [...prev, 'Lainnya'] : prev.filter(x => x !== 'Lainnya'))} />
-                    <span className="text-sm font-normal">Lainnya</span>
-                  </label>
-                </div>
+                {formOptions.productGroups.map((group) => (
+                  <div key={group.label ?? '_'}>
+                    {group.label && <p className="text-xs text-muted-foreground mb-1">{group.label}</p>}
+                    <div className="grid grid-cols-2 gap-2">
+                      {group.options.map((p) => (
+                        <label key={p} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox checked={productInterest.includes(p)} onCheckedChange={(checked) => setProductInterest(prev => checked ? [...prev, p] : prev.filter(x => x !== p))} />
+                          <span className="text-sm font-normal">{p}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={productInterest.includes('Lainnya')} onCheckedChange={(checked) => setProductInterest(prev => checked ? [...prev, 'Lainnya'] : prev.filter(x => x !== 'Lainnya'))} />
+                  <span className="text-sm font-normal">Lainnya</span>
+                </label>
                 {productInterest.includes('Lainnya') && (
                   <Input value={otherProduct} onChange={(e) => setOtherProduct(e.target.value)} placeholder="Sebutkan..." disabled={status === 'saving'} className="mt-1" />
                 )}
@@ -610,7 +664,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
               <div className="space-y-2">
                 <Label>Software yang digunakan saat ini</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {SOFTWARE_OPTIONS.map((s) => (
+                  {formOptions.software.map((s) => (
                     <label key={s} className="flex items-center gap-2 cursor-pointer">
                       <Checkbox checked={currentSoftware.includes(s)} onCheckedChange={(checked) => setCurrentSoftware(prev => checked ? [...prev, s] : prev.filter(x => x !== s))} />
                       <span className="text-sm font-normal">{s}</span>
@@ -643,7 +697,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
               <div className="space-y-2">
                 <Label>Tindak lanjut</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {FOLLOWUP_OPTIONS.map((f) => (
+                  {formOptions.followUp.map((f) => (
                     <div key={f} className="flex items-center gap-2">
                       <Checkbox checked={followUp.includes(f)} onCheckedChange={(c) => setFollowUp(prev => c ? [...prev, f] : prev.filter(x => x !== f))} id={`dlg-fu-${f}`} />
                       <Label htmlFor={`dlg-fu-${f}`} className="font-normal">{f}</Label>

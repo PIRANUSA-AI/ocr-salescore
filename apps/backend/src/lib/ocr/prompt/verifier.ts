@@ -32,6 +32,7 @@ LANGKAH 1 — REVIEW SETIAP FIELD:
 - JOB TITLE: Manager, Direktur, Engineer, Staff, Owner, GM, VP, Head.
 - DIVISION: Finance, IT, Marketing, HRD, Produksi, Engineering.
 - Jika tertukar, perbaiki posisinya.
+- ⚠️ BUKAN JOB TITLE: label section form seperti "MFG", "Manufacturing", "AEC", "Tim", "Sales", "Event". Ini metadata form, bukan jabatan orang. Jika jobTitle berisi salah satu dari ini → KOSONGKAN (value "", confidence "empty").
 
 📍 ADDRESS:
 - Alamat kantor atau pribadi, biasanya mengandung kata: Jl., Jalan, Ruko, Gedung, Kav., Blok, Lantai, Lt., Jakarta, Bandung, Surabaya, dll.

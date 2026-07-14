@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { FadeIn } from '@/components/ui/fade-in';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, MessageCircle, Mail, Eye, Sparkles, Copy, ArrowRight } from 'lucide-react';
+import { MessageCircle, Mail, Eye } from 'lucide-react';
 import { getSalesHome, type SalesHomeData, type SalesHomeLead } from '@/app/actions/sales-home';
-import { generateLeadActionAI } from '@/app/actions/lead-action-ai';
 import { PRIORITY_CONFIG, PRIORITY_ORDER, formatWaLink, type LeadPriority } from '@/lib/lead-scoring';
 import { EmailClientDialog } from '../../_components/email-client-dialog';
+import { SalesFilterBar, DEFAULT_FILTERS, type SalesFilters } from '../../_components/sales/sales-filter-bar';
+import { SalesExportButton } from '../../_components/sales/sales-export-button';
 
 const formatCurrency = (v: number | null | undefined) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v || 0);
@@ -33,16 +34,14 @@ const daysLabel = (d: number | null): string => {
     return `${d} hari lalu`;
 };
 
-type AiState = Record<string, { loading: boolean; result?: { action: string; reason: string; message: string }; error?: string }>;
-
 export function SalesHomeView() {
     const { userProfile } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const [data, setData] = useState<SalesHomeData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [ai, setAi] = useState<AiState>({});
     const [emailState, setEmailState] = useState({ isOpen: false, email: '' });
+    const [filters, setFilters] = useState<SalesFilters>(DEFAULT_FILTERS);
 
     useEffect(() => {
         if (!userProfile) return;
@@ -53,21 +52,34 @@ export function SalesHomeView() {
             .finally(() => setLoading(false));
     }, [userProfile, toast]);
 
-    const handleAi = async (lead: SalesHomeLead) => {
-        const id = lead.customer.id;
-        setAi((prev) => ({ ...prev, [id]: { loading: true } }));
-        try {
-            const result = await generateLeadActionAI(id);
-            setAi((prev) => ({ ...prev, [id]: { loading: false, result } }));
-        } catch (err) {
-            setAi((prev) => ({ ...prev, [id]: { loading: false, error: (err as Error).message } }));
+    const filteredLeads = useMemo(() => {
+        const leads = data?.leads ?? [];
+        let result = leads;
+        const q = filters.search.trim().toLowerCase();
+        if (q) {
+            result = result.filter(
+                (l) =>
+                    l.customer.name.toLowerCase().includes(q) ||
+                    (l.customer.company || '').toLowerCase().includes(q),
+            );
         }
-    };
+        if (filters.stage !== 'all') {
+            result = result.filter((l) => l.customer.pipelineStatus === filters.stage);
+        }
+        if (filters.event !== 'all') {
+            result = result.filter((l) => l.customer.acquisitionContext?.eventName === filters.event);
+        }
+        return result;
+    }, [data, filters]);
 
-    const copyText = (text: string) => {
-        navigator.clipboard.writeText(text);
-        toast({ title: 'Tersalin', description: 'Draf pesan disalin.' });
-    };
+    const eventOptions = useMemo(() => {
+        const names = new Set<string>();
+        (data?.leads ?? []).forEach((l) => {
+            const n = l.customer.acquisitionContext?.eventName;
+            if (n) names.add(n);
+        });
+        return [...names].sort();
+    }, [data]);
 
     if (loading) {
         return (
@@ -84,7 +96,19 @@ export function SalesHomeView() {
     const { stats, leads } = data;
     const firstName = userProfile?.name?.split(' ')[0] || '';
 
-    const byPriority = (p: LeadPriority) => leads.filter((l) => l.priority === p);
+    const byPriority = (p: LeadPriority) => {
+        const items = filteredLeads.filter((l) => l.priority === p);
+        if (filters.sort === 'urgent') return items;
+        const sorted = [...items];
+        if (filters.sort === 'newest') {
+            sorted.sort((a, b) => (a.daysSinceUpdate ?? Infinity) - (b.daysSinceUpdate ?? Infinity));
+        } else {
+            sorted.sort((a, b) => (b.customer.potentialRevenue || 0) - (a.customer.potentialRevenue || 0));
+        }
+        return sorted;
+    };
+
+    const filteredCount = (p: LeadPriority) => filteredLeads.filter((l) => l.priority === p).length;
 
     const quickActions = (lead: SalesHomeLead) => {
         const c = lead.customer;
@@ -107,7 +131,6 @@ export function SalesHomeView() {
 
     const leadCard = (lead: SalesHomeLead) => {
         const c = lead.customer;
-        const st = ai[c.id];
         return (
             <div key={c.id} className="rounded-lg border bg-card p-3.5 space-y-3">
                 <div className="flex items-start justify-between gap-3">
@@ -127,29 +150,7 @@ export function SalesHomeView() {
 
                 <div className="flex items-center gap-1 pt-0.5 border-t">
                     {quickActions(lead)}
-                    <Button variant="default" size="sm" className="ml-auto h-8 gap-1.5" disabled={st?.loading} onClick={() => handleAi(lead)}>
-                        {st?.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                        Saran AI
-                    </Button>
                 </div>
-
-                {st?.error && (
-                    <div className="text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded px-2 py-1.5">
-                        AI gagal: {st.error}
-                    </div>
-                )}
-                {st?.result && (
-                    <div className="rounded-md bg-muted/60 p-2.5 space-y-1.5 text-xs">
-                        <p className="font-semibold text-foreground">{st.result.action}</p>
-                        <p className="text-muted-foreground">{st.result.reason}</p>
-                        <div className="flex items-start gap-2 pt-1">
-                            <p className="flex-1 whitespace-pre-wrap text-foreground/90 leading-relaxed">{st.result.message}</p>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => copyText(st.result!.message)} title="Salin pesan">
-                                <Copy className="h-3 w-3" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
             </div>
         );
     };
@@ -202,17 +203,25 @@ export function SalesHomeView() {
                 ))}
             </div>
 
+            {/* Filter & Export toolbar */}
+            {leads.length > 0 && (
+                <SalesFilterBar filters={filters} onChange={setFilters} eventOptions={eventOptions}>
+                    <SalesExportButton leads={filteredLeads} salesName={userProfile?.name || 'Sales'} />
+                </SalesFilterBar>
+            )}
+
             {/* 3 bucket prioritas */}
             {leads.length === 0 ? (
                 <div className="text-center text-sm text-muted-foreground py-12 border rounded-lg border-dashed">
                     Belum ada lead aktif. Scan kartu nama atau tambah pelanggan untuk mulai.
                 </div>
+            ) : filteredLeads.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground py-12 border rounded-lg border-dashed">
+                    Tidak ada lead yang cocok dengan filter. Coba reset filter.
+                </div>
             ) : (
                 <div className="space-y-6">
-                    {PRIORITY_ORDER.map((p) => {
-                        const count = p === 'today' ? todayCount : p === 'active' ? activeCount : newCount;
-                        return section(p, count);
-                    })}
+                    {PRIORITY_ORDER.map((p) => section(p, filteredCount(p)))}
                 </div>
             )}
         </FadeIn>

@@ -24,6 +24,7 @@ export async function assertRelevantOcrImage(imageDataUri: string): Promise<OcrP
     temperature: 0,
     maxTokens: 512,
     imageDataUri,
+    imageDetail: 'low', // cuma cek relevan/tidak — 1 tile ~85 token cukup
     schema: OcrPreflightSchema,
     systemPrompt: `Anda adalah gatekeeper OCR untuk aplikasi SalesCore PT PIRANUSA.
 

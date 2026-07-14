@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useMemo } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useMediaQuery } from '@/hooks/use-media-query';
@@ -32,6 +32,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     const searchParams = useSearchParams();
     const isDesktop = useMediaQuery('(min-width: 1024px)');
 
+    // Server can't know viewport (isDesktop) or async auth state, so first client
+    // render must match server (spinner) before we branch on client-only hooks.
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+
     useEffect(() => {
         if (!loading && !user) router.push('/');
     }, [loading, user, router]);
@@ -52,7 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         else router.push(`/dashboard?view=${view}`, { scroll: false });
     };
 
-    if (loading) {
+    if (!mounted || loading) {
         return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
     }
     if (!user) return null;

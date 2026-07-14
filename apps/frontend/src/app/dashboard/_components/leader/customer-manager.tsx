@@ -61,6 +61,7 @@ export const CustomerManager = () => {
     const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
     const [pipelineFilter, setPipelineFilter] = useState('all');
     const [salesFilter, setSalesFilter] = useState('all');
+    const [eventFilter, setEventFilter] = useState('all');
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [sortOrder, setSortOrder] = useState<SortOrder>('default');
     const [currentPage, setCurrentPage] = useState(1);
@@ -99,6 +100,12 @@ export const CustomerManager = () => {
         return null;
     }, [salesTeam, salesNameByCode]);
 
+    const eventOptions = useMemo(() => {
+        const names = new Set<string>();
+        customers?.forEach(c => { if (c.acquisitionContext?.eventName) names.add(c.acquisitionContext.eventName); });
+        return [...names].sort();
+    }, [customers]);
+
     const filteredCustomers = useMemo(() => {
         if (!customers) return [];
         const filtered = customers.filter(c => {
@@ -115,12 +122,13 @@ export const CustomerManager = () => {
             const searchMatch = searchTerm === '' || nameMatch || companyMatch || emailMatch || phoneMatch;
             const pipelineMatch = pipelineFilter === 'all' || c.pipelineStatus === pipelineFilter;
             const salesMatch = salesFilter === 'all' || (salesFilter === 'unassigned' ? !c.assignedSalesId : c.assignedSalesId === salesFilter);
+            const eventMatch = eventFilter === 'all' || c.acquisitionContext?.eventName === eventFilter;
             let dateMatch = true;
             if (dateRange?.from) {
                 const createdAt = new Date(c.createdAt);
                 dateMatch = createdAt >= startOfDay(dateRange.from) && createdAt <= endOfDay(dateRange.to || dateRange.from);
             }
-            return searchMatch && pipelineMatch && salesMatch && dateMatch;
+            return searchMatch && pipelineMatch && salesMatch && eventMatch && dateMatch;
         });
 
         if (sortOrder === 'default') return filtered;
@@ -138,7 +146,7 @@ export const CustomerManager = () => {
             const countB = countBySales.get(b.assignedSalesId || 'unassigned') || 0;
             return (countA - countB) * direction;
         });
-    }, [customers, searchTerm, pipelineFilter, salesFilter, dateRange, sortOrder]);
+    }, [customers, searchTerm, pipelineFilter, salesFilter, eventFilter, dateRange, sortOrder]);
 
     const paginatedCustomers = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -146,11 +154,12 @@ export const CustomerManager = () => {
     }, [filteredCustomers, currentPage, itemsPerPage]);
 
     const pageCount = Math.ceil(filteredCustomers.length / itemsPerPage);
-    const isAnyFilterActive = pipelineFilter !== 'all' || salesFilter !== 'all' || !!dateRange || sortOrder !== 'default';
+    const isAnyFilterActive = pipelineFilter !== 'all' || salesFilter !== 'all' || eventFilter !== 'all' || !!dateRange || sortOrder !== 'default';
 
     const resetFilters = () => {
         setPipelineFilter('all');
         setSalesFilter('all');
+        setEventFilter('all');
         setDateRange(undefined);
         setSortOrder('default');
         setCurrentPage(1);
@@ -326,6 +335,17 @@ export const CustomerManager = () => {
                         {salesTeam.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
+                {eventOptions.length > 0 && (
+                    <Select value={eventFilter} onValueChange={(v) => { setEventFilter(v); setCurrentPage(1); }}>
+                        <SelectTrigger className="w-[130px] h-8 text-xs">
+                            <SelectValue placeholder="Event" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua Event</SelectItem>
+                            {eventOptions.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                )}
                 <DateRangePicker
                     range={dateRange}
                     onRangeChange={(v) => { setDateRange(v); setCurrentPage(1); }}

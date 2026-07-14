@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EmailBlastDialog } from '../../_components/leader/email-blast-dialog';
 import { FadeIn } from '@/components/ui/fade-in';
 import { ExportButton } from '@/components/crm/export-button';
@@ -55,6 +56,7 @@ export const GlobalCustomerManager = () => {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [eventFilter, setEventFilter] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
     const { toast } = useToast();
     const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
@@ -76,16 +78,29 @@ export const GlobalCustomerManager = () => {
             .finally(() => setIsLoading(false));
     }, [toast]);
 
+    const eventOptions = useMemo(() => {
+        const names = new Set<string>();
+        customers.forEach((c) => {
+            const n = c.acquisitionContext?.eventName;
+            if (n) names.add(n);
+        });
+        return [...names].sort();
+    }, [customers]);
+
     const filteredCustomers = useMemo(() => {
         if (!customers) return [];
-        return customers.filter(c =>
-            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (c.company && c.company.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (c.assignedSalesName && c.assignedSalesName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (c.team && c.team.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-    }, [customers, searchTerm]);
+        return customers.filter(c => {
+            const term = searchTerm.toLowerCase();
+            const searchMatch =
+                c.name.toLowerCase().includes(term) ||
+                (c.company && c.company.toLowerCase().includes(term)) ||
+                (c.email && c.email.toLowerCase().includes(term)) ||
+                (c.assignedSalesName && c.assignedSalesName.toLowerCase().includes(term)) ||
+                (c.team && c.team.toLowerCase().includes(term));
+            const eventMatch = eventFilter === 'all' || c.acquisitionContext?.eventName === eventFilter;
+            return searchMatch && eventMatch;
+        });
+    }, [customers, searchTerm, eventFilter]);
 
     const paginatedCustomers = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -155,6 +170,25 @@ export const GlobalCustomerManager = () => {
                                     }}
                                 />
                             </div>
+                            <Select
+                                value={eventFilter}
+                                onValueChange={(v) => {
+                                    setEventFilter(v);
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[200px] h-9">
+                                    <SelectValue placeholder="Event" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Semua Event</SelectItem>
+                                    {eventOptions.map((e) => (
+                                        <SelectItem key={e} value={e}>
+                                            {e}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         {/* Bulk action bar */}
                         {selectedCustomers.length > 0 && (

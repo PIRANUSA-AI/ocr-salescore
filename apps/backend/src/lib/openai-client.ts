@@ -15,6 +15,11 @@ export interface OpenAICallParams<T> {
   temperature?: number;
   maxTokens?: number;
   imageDataUri?: string;
+  // OpenAI vision `detail` untuk image_url. Default OpenAI = 'auto' → gambar
+  // dipecah jadi banyak tile (token & latensi meledak). Set eksplisit:
+  //  - 'high' → teks kartu/handwriting tajam (base read, box scan, slice)
+  //  - 'low'  → 1 tile ~85 token, cukup untuk cek relevansi (preflight)
+  imageDetail?: 'low' | 'high' | 'auto';
 }
 
 export async function callOpenAI<T>(params: OpenAICallParams<T>): Promise<T> {
@@ -33,7 +38,9 @@ export async function callOpenAI<T>(params: OpenAICallParams<T>): Promise<T> {
 
   const userContent: any[] = [{ type: 'text', text: params.userPrompt }];
   if (params.imageDataUri) {
-    userContent.push({ type: 'image_url', image_url: { url: normalizeImageUrl(params.imageDataUri) } });
+    const image_url: any = { url: normalizeImageUrl(params.imageDataUri) };
+    if (params.imageDetail) image_url.detail = params.imageDetail;
+    userContent.push({ type: 'image_url', image_url });
   }
   messages.push({ role: 'user', content: userContent });
 

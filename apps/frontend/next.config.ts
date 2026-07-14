@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: 15728640,
     },
+    // The OCR pipeline (multi-stage + slice-rescan) can run 30-45s. The dev
+    // rewrite proxy defaults to a 30s timeout and returns 500 past it — raise
+    // it so /api/v1/ocr/process completes instead of failing mid-scan.
+    proxyTimeout: 120_000,
   },
 
   // Proxy /api/v1/* requests to the backend API server.

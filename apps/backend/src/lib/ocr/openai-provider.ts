@@ -19,6 +19,7 @@ export function createOpenAIProvider(): OcrProvider {
           temperature: 0,
           maxTokens: 2048,
           imageDataUri,
+          imageDetail: 'high', // base read butuh teks tajam
         });
         return coerceOcrResult(raw);
       } catch (err: any) {

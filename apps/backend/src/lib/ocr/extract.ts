@@ -83,6 +83,7 @@ export async function extractCustomer(
         temperature: 0,
         maxTokens: 2048,
         imageDataUri,
+        imageDetail: 'high',
       });
 
       const boxScan = coerceBoxScanResult(rawBoxScan);
@@ -110,6 +111,7 @@ export async function extractCustomer(
         temperature: 0,
         maxTokens: 2048,
         imageDataUri,
+        imageDetail: 'high',
       });
 
       const reviewedResult = coerceOcrResult(reviewed);
