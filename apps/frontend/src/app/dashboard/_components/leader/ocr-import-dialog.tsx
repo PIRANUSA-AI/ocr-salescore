@@ -18,7 +18,8 @@ import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM } from '@/types';
+import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM, getDefaultDayIndex, eventDateForDay } from '@/types';
+import { EventDaySelect } from '@/components/ui/event-day-select';
 
 function matchOptions(answer: string, options: readonly string[]): { matched: string[]; other: string } {
   if (!answer) return { matched: [], other: '' };
@@ -111,6 +112,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
 
   const [salesCode, setSalesCode] = useState('');
   const [eventName, setEventName] = useState(DEFAULT_EVENT_BY_TEAM.AEC);
+  const [dayIndex, setDayIndex] = useState(() => getDefaultDayIndex(DEFAULT_EVENT_BY_TEAM.AEC));
   const [readingStep, setReadingStep] = useState(0);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
@@ -451,7 +453,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         acquisitionContext: {
           source: 'OCR',
           eventName: eventName.trim(),
-          eventDate: new Date(),
+          eventDate: eventDateForDay(eventName, dayIndex),
         },
         formAnswers,
       } as any);
@@ -575,6 +577,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
               <Label htmlFor="eventName">Event <span className="text-red-500">*</span></Label>
               <Select value={eventName} onValueChange={(val) => {
                 setEventName(val);
+                setDayIndex(getDefaultDayIndex(val));
                 const team = EVENT_TO_TEAM[val];
                 if (team) {
                   setCreatorTeam(team);
@@ -589,6 +592,8 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
                 </SelectContent>
               </Select>
             </div>
+
+            <EventDaySelect eventName={eventName} dayIndex={dayIndex} onDayChange={setDayIndex} />
 
             <div className="flex flex-col gap-1.5 p-3 border rounded-md bg-muted/20">
               <Label htmlFor="creatorTeam">Tim</Label>

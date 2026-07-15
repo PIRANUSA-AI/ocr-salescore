@@ -54,7 +54,7 @@ function rowToCustomer(row: CustomerRow): Customer {
 }
 
 export const customerRepo = {
-  async findAll(filters?: { assignedSalesId?: string; team?: 'AEC' | 'MFG' }): Promise<Customer[]> {
+  async findAll(filters?: { assignedSalesId?: string; team?: 'AEC' | 'MFG'; teams?: ('AEC' | 'MFG')[] }): Promise<Customer[]> {
     const conditions: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -63,7 +63,10 @@ export const customerRepo = {
       conditions.push(`assigned_sales_id = $${idx++}`);
       values.push(filters.assignedSalesId);
     }
-    if (filters?.team) {
+    if (filters?.teams && filters.teams.length > 0) {
+      conditions.push(`team = ANY($${idx++})`);
+      values.push(filters.teams);
+    } else if (filters?.team) {
       conditions.push(`team = $${idx++}`);
       values.push(filters.team);
     }

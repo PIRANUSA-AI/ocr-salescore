@@ -55,6 +55,8 @@ reports.get('/ocr', async (c) => {
   const team = (c.req.query('team') || 'all') as 'AEC' | 'MFG' | 'all';
   const fromParam = c.req.query('from'); // yyyy-mm-dd, dipakai saat range=custom
   const toParam = c.req.query('to'); // yyyy-mm-dd, dipakai saat range=custom
+  const event = c.req.query('event'); // eventName (opsional)
+  const eventDate = c.req.query('eventDate'); // yyyy-mm-dd (opsional, filter hari event)
 
   const conditions = [`acquisition_context->>'source' = 'OCR'`];
   const params: any[] = [];
@@ -71,6 +73,11 @@ reports.get('/ocr', async (c) => {
     params.push(team);
   }
 
+  if (event) {
+    conditions.push(`acquisition_context->>'eventName' = $${idx++}`);
+    params.push(event);
+  }
+
   const rows = await query<{
     id: string;
     email: string | null;
@@ -80,9 +87,10 @@ reports.get('/ocr', async (c) => {
     assigned_sales_name: string | null;
     potential_revenue: number | null;
     created_at: string;
+    acquisition_context: any;
   }>(
     `SELECT id, email, phone, pipeline_status, assigned_sales_id, assigned_sales_name,
-            potential_revenue, created_at
+            potential_revenue, created_at, acquisition_context
        FROM customers
       WHERE ${conditions.join(' AND ')}`,
     params,
@@ -116,6 +124,17 @@ reports.get('/ocr', async (c) => {
     customers = customers.filter((customer) => {
       const created = jakartaDate(customer.created_at);
       return created >= rangeStart && created <= (range === 'today' ? todayEnd : now);
+    });
+  }
+
+  if (eventDate) {
+    const dayStart = startOfJakartaDay(new Date(eventDate));
+    const dayEnd = endOfJakartaDay(new Date(eventDate));
+    customers = customers.filter((customer) => {
+      const raw = customer.acquisition_context?.eventDate;
+      if (!raw) return false;
+      const d = jakartaDate(raw);
+      return d >= dayStart && d <= dayEnd;
     });
   }
 

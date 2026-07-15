@@ -98,7 +98,7 @@ export async function getCustomers(filters?: { assignedSalesId?: string; team?: 
             if (!data.acquisitionContext) {
                 data.acquisitionContext = {
                     source: data.source || 'Lainnya', // Fallback to old 'source' field or 'Lainnya'
-                    eventName: 'MFI 2025', // As requested for old data
+                    eventName: 'Tidak Diketahui', // Legacy data tanpa acquisitionContext
                     eventDate: safeISODate(data.createdAt),
                 };
             }

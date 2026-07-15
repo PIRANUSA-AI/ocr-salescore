@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api-client';
+import { EVENT_OPTIONS, EVENT_DAYS, eventDayDate } from '@/types';
 import type { OcrReportData, OcrTimeRange, OcrTeamFilter } from '@/lib/report-types';
 import { Loader2, ScanLine, Zap, UserX, Trophy } from 'lucide-react';
 import { MetricCard } from '@/components/ui/metric-card';
@@ -48,6 +49,8 @@ export default function ReportPage() {
   const isSuperadmin = userProfile?.role === 'Superadmin';
   const [ocrRange, setOcrRange] = useState<OcrTimeRange>('30d');
   const [ocrTeam, setOcrTeam] = useState<OcrTeamFilter>('all');
+  const [ocrEvent, setOcrEvent] = useState<string>('all');
+  const [ocrDay, setOcrDay] = useState<string>('all');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
   const [ocrData, setOcrData] = useState<OcrReportData | null>(null);
   const [ocrLoading, setOcrLoading] = useState(true);
@@ -57,15 +60,19 @@ export default function ReportPage() {
     if (ocrRange === 'custom' && !customDateRange?.from) return;
     setOcrLoading(true);
     const team = userProfile.role === 'Leader' ? userProfile.team : ocrTeam;
+    const eventParam = ocrEvent !== 'all' ? ocrEvent : undefined;
+    const eventDateParam = ocrEvent !== 'all' && ocrDay !== 'all' && EVENT_DAYS[ocrEvent]?.[Number(ocrDay)]
+      ? EVENT_DAYS[ocrEvent][Number(ocrDay)]
+      : undefined;
+    const base: any = { range: ocrRange, team, event: eventParam, eventDate: eventDateParam };
     const params =
       ocrRange === 'custom' && customDateRange?.from
         ? {
-            range: ocrRange,
-            team,
+            ...base,
             from: format(customDateRange.from, 'yyyy-MM-dd'),
             to: format(customDateRange.to || customDateRange.from, 'yyyy-MM-dd'),
           }
-        : { range: ocrRange, team };
+        : base;
     api.reports.ocr(params)
       .then((res) => setOcrData(res.report as OcrReportData))
       .catch((err) => {
@@ -73,7 +80,7 @@ export default function ReportPage() {
         setOcrData(null);
       })
       .finally(() => setOcrLoading(false));
-  }, [userProfile, ocrRange, ocrTeam, customDateRange]);
+  }, [userProfile, ocrRange, ocrTeam, customDateRange, ocrEvent, ocrDay]);
 
   const handleCustomDateChange = (range: DateRange | undefined) => {
     setCustomDateRange(range);
@@ -124,7 +131,29 @@ export default function ReportPage() {
               </button>
             ))}
           </div>
-          <DateRangePicker range={customDateRange} onRangeChange={handleCustomDateChange} className="[&_button#date]:h-8 [&_button#date]:w-[240px] [&_button#date]:text-xs" />
+          {/* <DateRangePicker range={customDateRange} onRangeChange={handleCustomDateChange} className="[&_button#date]:h-8 [&_button#date]:w-[240px] [&_button#date]:text-xs" /> */}
+          <Select value={ocrEvent} onValueChange={(v) => { setOcrEvent(v); setOcrDay('all'); }}>
+            <SelectTrigger className="h-8 w-[180px] text-xs">
+              <SelectValue placeholder="Event" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Event</SelectItem>
+              {EVENT_OPTIONS.map((e) => (
+                <SelectItem key={e} value={e}>{e}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={ocrDay} onValueChange={(v) => setOcrDay(v)} disabled={ocrEvent === 'all'}>
+            <SelectTrigger className="h-8 w-[150px] text-xs">
+              <SelectValue placeholder="Day" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Day</SelectItem>
+              {ocrEvent !== 'all' && EVENT_DAYS[ocrEvent]?.map((dateStr, i) => (
+                <SelectItem key={i} value={String(i)}>Day {i + 1} ({eventDayDate(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-2">
           {ocrLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

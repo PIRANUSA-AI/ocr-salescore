@@ -155,7 +155,19 @@ async function refreshImageUrl(c: Customer): Promise<Customer> {
 customers.get('/', async (c) => {
   const team = c.req.query('team') as 'AEC' | 'MFG' | undefined;
   const assignedSalesId = c.req.query('assignedSalesId');
-  const list = await customerRepo.findAll({ assignedSalesId, team });
+  const session: SessionPayload | null = c.get('session');
+
+  // Multi-team support: jika user punya secondaryTeam, return kedua tim
+  let teams: ('AEC' | 'MFG')[] | undefined;
+  if (session?.secondaryTeam && session.secondaryTeam !== session.team) {
+    teams = [session.team, session.secondaryTeam];
+  }
+
+  const list = await customerRepo.findAll({
+    assignedSalesId,
+    team: teams ? undefined : team,
+    teams,
+  });
   const withUrls = await Promise.all(list.map(refreshImageUrl));
   return c.json({ customers: withUrls });
 });
@@ -165,7 +177,13 @@ customers.post('/opportunities/analyze', async (c) => {
   const session: SessionPayload | null = c.get('session');
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
-  const filters = session.role === 'Superadmin' ? undefined : session.role === 'Leader' ? { team: session.team } : { assignedSalesId: session.uid };
+  const filters = session.role === 'Superadmin'
+    ? undefined
+    : session.role === 'Leader'
+      ? (session.secondaryTeam && session.secondaryTeam !== session.team
+          ? { teams: [session.team, session.secondaryTeam] }
+          : { team: session.team })
+      : { assignedSalesId: session.uid };
   const customersForAnalysis = await customerRepo.findAll(filters);
   const createdTasks: any[] = [];
   const batchSize = 5;

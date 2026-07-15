@@ -459,6 +459,18 @@ export default function CustomerDetailPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-1">
+                                    <Label>Event</Label>
+                                    <p className="text-sm text-muted-foreground">{customer.acquisitionContext?.eventName || '-'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Tanggal Event</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        {customer.acquisitionContext?.eventDate
+                                            ? new Date(customer.acquisitionContext.eventDate).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                                            : '-'}
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
                                     <Label htmlFor="email">Email</Label>
                                     <div className="flex items-center gap-2">
                                         <Input id="email" type="email" {...form.register('email')} className="flex-1" />

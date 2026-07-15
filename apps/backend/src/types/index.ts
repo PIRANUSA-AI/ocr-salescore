@@ -104,6 +104,7 @@ export type UserProfile = {
   email: string;
   role: UserRole;
   team: Team;
+  secondaryTeam?: Team | null;
   photoURL?: string;
   salesCode?: string | null;
 };
@@ -201,6 +202,7 @@ export type SessionPayload = {
   email: string;
   role: UserRole;
   team: Team;
+  secondaryTeam?: Team | null;
   photoURL?: string;
   salesCode?: string | null;
 };

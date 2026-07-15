@@ -7,7 +7,7 @@ import { Loader2, Search, Eye, Edit, ScanLine, Trash2, Mail, Phone, PlusCircle, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { type Customer, PIPELINE_STAGES, PipelineStatus } from '@/types';
+import { type Customer, PIPELINE_STAGES, PipelineStatus, EVENT_DAYS, getEventDayIndex, eventDateForDay, eventDayDate } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '@/app/dashboard/dashboard-context';
 import { OcrImportDialog } from './ocr-import-dialog';
@@ -239,6 +239,32 @@ export const CustomerManager = () => {
         }
     }, [toast, refreshAllData]);
 
+    const getCustomerDayIndex = useCallback((c: Customer): number => {
+        const ctx = c.acquisitionContext;
+        if (!ctx?.eventName) return -1;
+        const days = EVENT_DAYS[ctx.eventName];
+        if (!days || days.length === 0) return -1;
+        const idx = getEventDayIndex(ctx.eventName, new Date(ctx.eventDate || c.createdAt));
+        return idx >= 0 ? idx : 0;
+    }, []);
+
+    const handleUpdateEventDay = useCallback(async (customerId: string, customerName: string, ctx: Customer['acquisitionContext'] | undefined, newDayIndex: number) => {
+        const eventName = ctx?.eventName || '';
+        try {
+            await api.customers.update(customerId, {
+                acquisitionContext: {
+                    source: ctx?.source || 'Lainnya',
+                    eventName,
+                    eventDate: eventDateForDay(eventName, newDayIndex).toISOString(),
+                },
+            });
+            await api.activities.create({ action: `mengubah hari event ${customerName} menjadi Day ${newDayIndex + 1}`, targetId: customerId, targetName: customerName });
+            refreshAllData();
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Gagal', description: (error as Error).message });
+        }
+    }, [toast, refreshAllData]);
+
     const handleDeleteSingleCustomer = async (customerId: string) => {
         setIsDeleting(true);
         try { await handleBulkDelete([customerId]); } catch { } finally { setIsDeleting(false); }
@@ -346,11 +372,11 @@ export const CustomerManager = () => {
                         </SelectContent>
                     </Select>
                 )}
-                <DateRangePicker
+                {/* <DateRangePicker
                     range={dateRange}
                     onRangeChange={(v) => { setDateRange(v); setCurrentPage(1); }}
                     className="[&_button#date]:h-8 [&_button#date]:w-[190px] [&_button#date]:text-xs"
-                />
+                /> */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 relative">
@@ -447,6 +473,8 @@ export const CustomerManager = () => {
                                 <TableHead className="text-xs">Nama</TableHead>
                                 <TableHead className="text-xs w-[130px]">Status</TableHead>
                                 <TableHead className="text-xs w-[110px]">Sales</TableHead>
+                                <TableHead className="text-xs w-[150px]">Event</TableHead>
+                                <TableHead className="text-xs w-[140px]">Day</TableHead>
                                 <TableHead className="text-xs">Kontak</TableHead>
                                 <TableHead className="text-xs w-[80px]">Aksi</TableHead>
                             </TableRow>
@@ -459,6 +487,8 @@ export const CustomerManager = () => {
                                         <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                                         <TableCell><Skeleton className="h-7 w-24" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-10" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                        <TableCell><Skeleton className="h-7 w-20" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-36" /></TableCell>
                                         <TableCell><Skeleton className="h-7 w-16" /></TableCell>
                                     </TableRow>
@@ -487,6 +517,25 @@ export const CustomerManager = () => {
                                             )}
                                         </TableCell>
                                         <TableCell>
+                                            <span className="text-xs text-muted-foreground truncate block max-w-[140px]" title={c.acquisitionContext?.eventName || ''}>
+                                                {c.acquisitionContext?.eventName || '-'}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                            {c.acquisitionContext?.eventName && EVENT_DAYS[c.acquisitionContext.eventName] ? (
+                                                <Select value={String(getCustomerDayIndex(c))} onValueChange={(v) => handleUpdateEventDay(c.id, c.name, c.acquisitionContext, Number(v))}>
+                                                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {EVENT_DAYS[c.acquisitionContext.eventName].map((dateStr, i) => (
+                                                            <SelectItem key={i} value={String(i)}>Day {i + 1} ({eventDayDate(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })})</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
                                             <div className="flex flex-col gap-1">
                                                 {emailBtn(c.email)}
                                                 {phoneDisplay(c.phone)}
@@ -512,7 +561,7 @@ export const CustomerManager = () => {
                                     </TableRow>
                                 ))
                             ) : (
-                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground h-24 text-sm">Belum ada data pelanggan.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground h-24 text-sm">Belum ada data pelanggan.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
