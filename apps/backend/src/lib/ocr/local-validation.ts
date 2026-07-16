@@ -1,4 +1,5 @@
 import { resolveMx } from 'dns/promises';
+import { cacheGet } from '../redis.js';
 import type { OcrResult } from './types.js';
 
 export type EmailLocalStatus =
@@ -59,8 +60,14 @@ async function validateEmailLocally(value: string): Promise<OcrLocalValidation['
   }
 
   try {
-    const records = await resolveMx(domain);
-    const mxHosts = records.map((record) => record.exchange).filter(Boolean);
+    const mxHosts = await cacheGet(
+      `dns:mx:${domain}`,
+      async () => {
+        const records = await resolveMx(domain);
+        return records.map((record) => record.exchange).filter(Boolean);
+      },
+      3600,
+    );
     return {
       raw,
       normalized,

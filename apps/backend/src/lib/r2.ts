@@ -75,6 +75,15 @@ export function mimeToExt(mime: string): string {
   return MIME_EXT[mime] || 'bin';
 }
 
+export async function downloadFromR2(key: string): Promise<{ buffer: Buffer; contentType: string }> {
+  const response = await s3.send(
+    new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }),
+  );
+  const body = await response.Body!.transformToByteArray();
+  const buffer = Buffer.from(body);
+  return { buffer, contentType: response.ContentType || 'image/jpeg' };
+}
+
 export async function uploadOcrImage(
   dataUri: string,
 ): Promise<{ key: string; url: string }> {

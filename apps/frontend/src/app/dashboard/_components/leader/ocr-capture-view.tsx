@@ -206,7 +206,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     };
     poll(); // sekali saat mount / saat status berubah — ambil state terbaru
     if (!hasActiveJobs) return; // idle: tidak usah interval
-    const interval = setInterval(poll, 5000);
+    const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
   }, [userProfile, hasActiveJobs]);
 
