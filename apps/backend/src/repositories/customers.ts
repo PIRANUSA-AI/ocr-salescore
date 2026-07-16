@@ -129,6 +129,8 @@ export const customerRepo = {
       pipelineStatus: 'pipeline_status', assignedSalesId: 'assigned_sales_id',
       assignedSalesName: 'assigned_sales_name', potentialRevenue: 'potential_revenue',
       imageUrl: 'image_url', imageKey: 'image_key',
+      acquisitionContext: 'acquisition_context', formAnswers: 'form_answers',
+      webinarHistory: 'webinar_history', generationHistory: 'generation_history',
     };
 
     const jsonFields = new Set(['acquisitionContext', 'products', 'formAnswers', 'webinarHistory', 'notes', 'generationHistory']);

@@ -68,10 +68,9 @@ export function getEventDayIndex(eventName: string, date: Date): number {
     return days.indexOf(iso);
 }
 
-// Default day index: ikut hari ini kalau jatuh di rentang event, kalau tidak → Day 1 (index 0).
-export function getDefaultDayIndex(eventName: string): number {
-    const idx = getEventDayIndex(eventName, new Date());
-    return idx >= 0 ? idx : 0;
+// Default day index: selalu Day 1 (index 0). Tidak berpatokan tanggal — operator OCR yang menentukan manual.
+export function getDefaultDayIndex(_eventName: string): number {
+    return 0;
 }
 
 // Format panjang, mis. "Rabu, 8 Juli 2026".
