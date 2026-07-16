@@ -39,6 +39,8 @@ export interface ExtractResult extends Omit<OcrResult, 'formAnswers'> {
   localValidation?: OcrLocalValidation;
   /** Public R2 URL of the uploaded scan image - save this to the customer record. */
   imageUrl?: string;
+  /** R2 object key for the uploaded scan image. */
+  imageKey?: string;
 }
 
 const DEFAULT_UNCERTAIN: Confidence[] = ['low', 'medium'];

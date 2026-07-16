@@ -145,7 +145,12 @@ Analisis peluang cross-sell/upsell untuk pelanggan ini.`;
 async function refreshImageUrl(c: Customer): Promise<Customer> {
   if (c.imageKey) {
     try {
-      c.imageUrl = await getPresignedUrl(c.imageKey, 3600);
+      let key = c.imageKey;
+      if (key.startsWith('http')) {
+        const url = new URL(key);
+        key = url.pathname.slice(1);
+      }
+      c.imageUrl = await getPresignedUrl(key, 3600);
     } catch { /* keep existing/stale imageUrl */ }
   }
   return c;

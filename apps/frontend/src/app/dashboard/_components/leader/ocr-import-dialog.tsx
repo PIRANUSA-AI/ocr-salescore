@@ -449,7 +449,7 @@ export function OcrImportDialog({ isOpen, onOpenChange, onCustomerAdded, capture
         assignedSalesName: matchedSales?.name ?? null,
         notes: `Sales: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: result?.imageUrl || '',
-        imageKey: '',
+        imageKey: result?.imageKey || '',
         acquisitionContext: {
           source: 'OCR',
           eventName: eventName.trim(),

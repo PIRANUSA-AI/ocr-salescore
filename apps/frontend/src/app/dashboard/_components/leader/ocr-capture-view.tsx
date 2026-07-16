@@ -72,6 +72,7 @@ interface OcrJobData {
     address: { value: string; alternatives: string[]; confidence: Confidence };
     formAnswers: { question: string; answer: string }[];
     imageUrl: string;
+    imageKey?: string;
   };
 }
 
@@ -443,7 +444,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         assignedSalesId: matchedSales?.uid ?? null,
         assignedSalesName: matchedSales?.name ?? null,
         imageUrl: jobFields.imageUrl || '',
-        imageKey: activeJob.result.imageUrl || '',
+        imageKey: activeJob.result.imageKey || activeJob.result.imageUrl || '',
         acquisitionContext: {
           source: 'OCR',
           eventName: eventName.trim(),

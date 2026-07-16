@@ -226,7 +226,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 assignedSalesName: null,
                 notes: `Kode sales: ${salesCode}`,
                 imageUrl: result?.imageUrl || '',
-                imageKey: '',
+                imageKey: result?.imageKey || '',
                 acquisitionContext: {
                     source: 'OCR',
                     eventName: eventName.trim(),

@@ -63,6 +63,7 @@ export async function processOcrSync(
     const { extractCustomer } = await import('../lib/ocr/extract.js');
     const result = await extractCustomer(workingImage, { alwaysSecondOpinion: false, team });
     result.imageUrl = imageUrl;
+    result.imageKey = key;
 
     // Step 4: slice-rescan kalau ada SECTION WAJIB yang hilang.
     // Full-page pass sering melewati satu section (mis. Industri / Software) diam-diam
