@@ -11,11 +11,19 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api-client';
 import type { OcrReportData } from '@/lib/report-types';
 
+interface ExcelFilterParams {
+  team?: 'AEC' | 'MFG';
+  event?: string;
+  eventDate?: string;
+  from?: string;
+  to?: string;
+}
+
 interface Props {
   ocrData: OcrReportData;
   periodeLabel: string;
   timLabel: string;
-  excelTeam?: 'AEC' | 'MFG';
+  excelFilters: ExcelFilterParams;
 }
 
 const currency = (v: number) =>
@@ -26,7 +34,7 @@ const currency = (v: number) =>
     maximumFractionDigits: 0,
   }).format(v);
 
-export function OcrReportExport({ ocrData, periodeLabel, timLabel, excelTeam }: Props) {
+export function OcrReportExport({ ocrData, periodeLabel, timLabel, excelFilters }: Props) {
   const [loading, setLoading] = useState<'pdf' | 'excel' | null>(null);
   const { toast } = useToast();
 
@@ -158,7 +166,7 @@ export function OcrReportExport({ ocrData, periodeLabel, timLabel, excelTeam }: 
   const handleExportExcel = async () => {
     setLoading('excel');
     try {
-      const result = await api.exports.customersToExcel({ team: excelTeam });
+      const result = await api.exports.customersToExcel(excelFilters);
       if (!result.success || !result.data || result.data.length === 0) {
         toast({ variant: 'destructive', title: 'Export Gagal', description: 'Tidak ada data untuk diekspor.' });
         return;
@@ -178,12 +186,13 @@ export function OcrReportExport({ ocrData, periodeLabel, timLabel, excelTeam }: 
         { wch: 16 }, // Potensi Revenue
         { wch: 26 }, // Produk
         { wch: 12 }, // Sumber
+        { wch: 30 }, // Catatan
         { wch: 20 }, // Dibuat
         { wch: 20 }, // Diupdate
       ];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Customers');
-      const fileName = `SalesCore_Customers_${excelTeam || 'All'}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      const fileName = `SalesCore_Customers_${excelFilters.team || 'All'}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
       XLSX.writeFile(workbook, fileName);
       toast({ title: 'Excel Berhasil', description: `${result.data.length} data customer berhasil didownload.` });
     } catch (err) {

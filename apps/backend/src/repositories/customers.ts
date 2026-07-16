@@ -54,7 +54,7 @@ function rowToCustomer(row: CustomerRow): Customer {
 }
 
 export const customerRepo = {
-  async findAll(filters?: { assignedSalesId?: string; team?: 'AEC' | 'MFG'; teams?: ('AEC' | 'MFG')[] }): Promise<Customer[]> {
+  async findAll(filters?: { assignedSalesId?: string; team?: 'AEC' | 'MFG'; teams?: ('AEC' | 'MFG')[]; event?: string; eventDate?: string; from?: string; to?: string }): Promise<Customer[]> {
     const conditions: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -69,6 +69,22 @@ export const customerRepo = {
     } else if (filters?.team) {
       conditions.push(`team = $${idx++}`);
       values.push(filters.team);
+    }
+    if (filters?.event) {
+      conditions.push(`acquisition_context->>'eventName' = $${idx++}`);
+      values.push(filters.event);
+    }
+    if (filters?.eventDate) {
+      conditions.push(`DATE(acquisition_context->>'eventDate') = $${idx++}::date`);
+      values.push(filters.eventDate);
+    }
+    if (filters?.from) {
+      conditions.push(`created_at >= $${idx++}::timestamp`);
+      values.push(filters.from);
+    }
+    if (filters?.to) {
+      conditions.push(`created_at <= ($${idx++}::timestamp + interval '1 day' - interval '1 second')`);
+      values.push(filters.to);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

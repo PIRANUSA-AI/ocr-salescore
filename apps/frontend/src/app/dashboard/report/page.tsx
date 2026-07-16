@@ -59,7 +59,7 @@ export default function ReportPage() {
     if (!userProfile) return;
     if (ocrRange === 'custom' && !customDateRange?.from) return;
     setOcrLoading(true);
-    const team = userProfile.role === 'Leader' ? userProfile.team : ocrTeam;
+    const team = ocrTeam;
     const eventParam = ocrEvent !== 'all' ? ocrEvent : undefined;
     const eventDateParam = ocrEvent !== 'all' && ocrDay !== 'all' && EVENT_DAYS[ocrEvent]?.[Number(ocrDay)]
       ? EVENT_DAYS[ocrEvent][Number(ocrDay)]
@@ -100,18 +100,33 @@ export default function ReportPage() {
         : format(customDateRange.from, 'd MMM yyyy')
       : RANGE_OPTIONS.find((o) => o.value === ocrRange)?.label || ocrRange;
   const timLabel =
-    userProfile?.role === 'Leader'
+    userProfile?.role === 'Leader' && userProfile?.secondaryTeam
+      ? `Tim ${userProfile.team} + ${userProfile.secondaryTeam}`
+      : userProfile?.role === 'Leader'
       ? `Tim ${userProfile.team}`
       : ocrTeam === 'all'
       ? 'Semua Tim'
       : `Tim ${ocrTeam}`;
-  const excelTeam: 'AEC' | 'MFG' | undefined =
-    userProfile?.role === 'Leader' ? userProfile.team : ocrTeam === 'all' ? undefined : ocrTeam;
+  const excelTeam: 'AEC' | 'MFG' | undefined = ocrTeam === 'all' ? undefined : ocrTeam;
+
+  const excelFilters = {
+    team: excelTeam,
+    event: ocrEvent !== 'all' ? ocrEvent : undefined,
+    eventDate: ocrEvent !== 'all' && ocrDay !== 'all' && EVENT_DAYS[ocrEvent]?.[Number(ocrDay)]
+      ? EVENT_DAYS[ocrEvent][Number(ocrDay)]
+      : undefined,
+    from: ocrRange === 'custom' && customDateRange?.from
+      ? format(customDateRange.from, 'yyyy-MM-dd')
+      : undefined,
+    to: ocrRange === 'custom' && customDateRange?.to
+      ? format(customDateRange.to, 'yyyy-MM-dd')
+      : undefined,
+  };
 
   return (
     <FadeIn className="space-y-6">
       <PageHeader title="Laporan" description="Aktivitas & performa leads hasil scan OCR">
-        <OcrReportExport ocrData={ocrData} periodeLabel={periodeLabel} timLabel={timLabel} excelTeam={excelTeam} />
+        <OcrReportExport ocrData={ocrData} periodeLabel={periodeLabel} timLabel={timLabel} excelFilters={excelFilters} />
       </PageHeader>
 
       {/* Filter bar */}

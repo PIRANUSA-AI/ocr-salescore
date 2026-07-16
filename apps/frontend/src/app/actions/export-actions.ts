@@ -17,6 +17,20 @@ const fmtDate = (v: any): string => {
     }
 };
 
+const formatNotes = (notes: any, formAnswers?: any[]): string => {
+    const parts: string[] = [];
+    if (notes && typeof notes === 'object') {
+        if (notes.manual?.trim()) parts.push(notes.manual);
+        if (notes.webinar?.length) parts.push(notes.webinar.map((w: any) => `[Webinar] ${w.text}`).join('; '));
+        if (notes.replyAssistant?.length) parts.push(notes.replyAssistant.map((r: any) => `[AI] ${r.text}`).join('; '));
+    }
+    if (formAnswers?.length) {
+        const formData = formAnswers.filter((fa: any) => fa.answer?.trim()).map((fa: any) => `${fa.question}: ${fa.answer}`).join('\n');
+        if (formData) parts.push(formData);
+    }
+    return parts.join('\n---\n');
+};
+
 /**
  * Export customers to Excel format (returns JSON for client-side processing)
  */
@@ -61,6 +75,7 @@ export async function exportCustomersToExcel(filters?: {
             'Potensi Revenue': c.potentialRevenue || 0,
             'Produk': c.products?.map(p => p.name).join(', ') || '',
             'Sumber': c.acquisitionContext?.source || '',
+            'Catatan': formatNotes(c.notes, c.formAnswers),
             'Dibuat': fmtDate(c.createdAt),
             'Diupdate': fmtDate(c.updatedAt),
         }));

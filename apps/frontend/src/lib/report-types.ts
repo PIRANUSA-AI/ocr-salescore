@@ -49,6 +49,7 @@ export interface CustomerExportRow {
   'Potensi Revenue': number;
   Produk: string;
   Sumber: string;
+  Catatan: string;
   Dibuat: string;
   Diupdate: string;
 }

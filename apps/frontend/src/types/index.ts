@@ -193,6 +193,7 @@ export type UserProfile = {
     email: string;
     role: 'Leader' | 'Sales' | 'Superadmin';
     team: 'AEC' | 'MFG';
+    secondaryTeam?: 'AEC' | 'MFG' | null;
     photoURL?: string;
     salesCode?: string | null;
 };

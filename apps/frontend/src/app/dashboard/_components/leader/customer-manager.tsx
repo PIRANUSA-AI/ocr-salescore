@@ -165,6 +165,20 @@ export const CustomerManager = () => {
         setCurrentPage(1);
     };
 
+    const formatNotes = (notes: any, formAnswers?: any[]): string => {
+        const parts: string[] = [];
+        if (notes && typeof notes === 'object') {
+            if (notes.manual?.trim()) parts.push(notes.manual);
+            if (notes.webinar?.length) parts.push(notes.webinar.map((w: any) => `[Webinar] ${w.text}`).join('; '));
+            if (notes.replyAssistant?.length) parts.push(notes.replyAssistant.map((r: any) => `[AI] ${r.text}`).join('; '));
+        }
+        if (formAnswers?.length) {
+            const formData = formAnswers.filter((fa: any) => fa.answer?.trim()).map((fa: any) => `${fa.question}: ${fa.answer}`).join('\n');
+            if (formData) parts.push(formData);
+        }
+        return parts.join('\n---\n');
+    };
+
     const handleDownload = () => {
         if (!customers || customers.length === 0) {
             toast({ variant: "destructive", title: "Tidak ada data untuk diunduh", description: "Silakan tambahkan pelanggan terlebih dahulu." });
@@ -175,6 +189,7 @@ export const CustomerManager = () => {
             'Nama': c.name, 'Perusahaan': c.company, 'Email': c.email, 'Telepon': c.phone,
             'Status': c.pipelineStatus, 'Sales': c.assignedSalesName || '-',
             'Kode Sales': (c.assignedSalesId && salesCodeByUid.get(c.assignedSalesId)) || '',
+            'Catatan': formatNotes(c.notes, c.formAnswers),
             'Tanggal': new Date(c.createdAt).toLocaleDateString('id-ID'),
         }));
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);

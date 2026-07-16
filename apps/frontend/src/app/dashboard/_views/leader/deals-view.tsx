@@ -26,6 +26,20 @@ export default function DealsView() {
     refreshAllData();
   }
 
+  const formatNotes = (notes: any, formAnswers?: any[]): string => {
+    const parts: string[] = [];
+    if (notes && typeof notes === 'object') {
+      if (notes.manual?.trim()) parts.push(notes.manual);
+      if (notes.webinar?.length) parts.push(notes.webinar.map((w: any) => `[Webinar] ${w.text}`).join('; '));
+      if (notes.replyAssistant?.length) parts.push(notes.replyAssistant.map((r: any) => `[AI] ${r.text}`).join('; '));
+    }
+    if (formAnswers?.length) {
+      const formData = formAnswers.filter((fa: any) => fa.answer?.trim()).map((fa: any) => `${fa.question}: ${fa.answer}`).join('\n');
+      if (formData) parts.push(formData);
+    }
+    return parts.join('\n---\n');
+  };
+
   const handleDownload = () => {
     const dataToExport = selectedCards.length > 0
       ? filteredCustomers.filter(c => selectedCards.includes(c.id))
@@ -44,6 +58,7 @@ export default function DealsView() {
       'Potensi Pendapatan': c.potentialRevenue,
       'Sales Ditugaskan': c.assignedSalesName,
       'Sumber': c.acquisitionContext?.source || '-',
+      'Catatan': formatNotes(c.notes, c.formAnswers),
       'Dibuat pada': new Date(c.createdAt).toLocaleDateString('id-ID'),
       'Diperbarui pada': new Date(c.updatedAt).toLocaleDateString('id-ID'),
       'Produk': c.products.map(p => p.name).join(', ')

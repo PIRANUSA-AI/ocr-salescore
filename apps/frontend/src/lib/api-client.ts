@@ -36,6 +36,27 @@ function formatDate(value: any): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('id-ID');
 }
 
+function formatNotes(notes: any, formAnswers?: any[]): string {
+  const parts: string[] = [];
+  if (notes && typeof notes === 'object') {
+    if (notes.manual?.trim()) parts.push(notes.manual);
+    if (notes.webinar?.length) {
+      parts.push(notes.webinar.map((w: any) => `[Webinar] ${w.text}`).join('; '));
+    }
+    if (notes.replyAssistant?.length) {
+      parts.push(notes.replyAssistant.map((r: any) => `[AI] ${r.text}`).join('; '));
+    }
+  }
+  if (formAnswers?.length) {
+    const formData = formAnswers
+      .filter((fa: any) => fa.answer && fa.answer.trim())
+      .map((fa: any) => `${fa.question}: ${fa.answer}`)
+      .join('\n');
+    if (formData) parts.push(formData);
+  }
+  return parts.join('\n---\n');
+}
+
 // ─── Auth ────────────────────────────────────────────
 export const api = {
   auth: {
@@ -61,10 +82,14 @@ export const api = {
 
   // ─── Customers ────────────────────────────────────
   customers: {
-    list(params?: { assignedSalesId?: string; team?: string }) {
+    list(params?: { assignedSalesId?: string; team?: string; event?: string; eventDate?: string; from?: string; to?: string }) {
       const qs = new URLSearchParams();
       if (params?.assignedSalesId) qs.set('assignedSalesId', params.assignedSalesId);
       if (params?.team) qs.set('team', params.team);
+      if (params?.event) qs.set('event', params.event);
+      if (params?.eventDate) qs.set('eventDate', params.eventDate);
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
       const q = qs.toString();
       return request<{ customers: any[] }>('GET', `/customers${q ? `?${q}` : ''}`);
     },
@@ -274,9 +299,15 @@ export const api = {
 
   // ─── Client-side export helpers backed by API data ─────────────
   exports: {
-    async customersToExcel(filters?: { team?: 'AEC' | 'MFG'; salesId?: string; pipelineStatus?: string }) {
+    async customersToExcel(filters?: { team?: 'AEC' | 'MFG'; salesId?: string; pipelineStatus?: string; event?: string; eventDate?: string; from?: string; to?: string }) {
       const [customersRes, salesRes] = await Promise.all([
-        api.customers.list(filters?.team ? { team: filters.team } : undefined),
+        api.customers.list({
+          team: filters?.team,
+          event: filters?.event,
+          eventDate: filters?.eventDate,
+          from: filters?.from,
+          to: filters?.to,
+        }),
         api.users.listSales(filters?.team),
       ]);
 
@@ -302,6 +333,7 @@ export const api = {
           'Potensi Revenue': c.potentialRevenue || 0,
           Produk: c.products?.map((p: any) => p.name).join(', ') || '',
           Sumber: c.acquisitionContext?.source || '',
+          Catatan: formatNotes(c.notes, c.formAnswers),
           Dibuat: formatDate(c.createdAt),
           Diupdate: formatDate(c.updatedAt),
         })),

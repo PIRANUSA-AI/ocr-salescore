@@ -32,6 +32,21 @@ export function SalesExportButton({ leads, salesName }: Props) {
 
     if (leads.length === 0) return null;
 
+    const formatNotes = (notes: any, formAnswers?: any[]): string => {
+        if (!notes || typeof notes !== 'object') return '';
+        const parts: string[] = [];
+        if (notes && typeof notes === 'object') {
+            if (notes.manual?.trim()) parts.push(notes.manual);
+            if (notes.webinar?.length) parts.push(notes.webinar.map((w: any) => `[Webinar] ${w.text}`).join('; '));
+            if (notes.replyAssistant?.length) parts.push(notes.replyAssistant.map((r: any) => `[AI] ${r.text}`).join('; '));
+        }
+        if (formAnswers?.length) {
+            const formData = formAnswers.filter((fa: any) => fa.answer?.trim()).map((fa: any) => `${fa.question}: ${fa.answer}`).join('\n');
+            if (formData) parts.push(formData);
+        }
+        return parts.join('\n---\n');
+    };
+
     const handleExcel = () => {
         setLoading('excel');
         try {
@@ -47,6 +62,7 @@ export function SalesExportButton({ leads, salesName }: Props) {
                     'Potensi Revenue': c.potentialRevenue || 0,
                     Produk: c.products?.map((p) => p.name).join(', ') || '',
                     Sumber: c.acquisitionContext?.source || '',
+                    Catatan: formatNotes(c.notes, c.formAnswers),
                     Event: c.acquisitionContext?.eventName || '',
                     Prioritas: l.priority,
                     'Update Terakhir': l.daysSinceUpdate !== null ? `${l.daysSinceUpdate} hari lalu` : '',

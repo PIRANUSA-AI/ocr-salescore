@@ -7,9 +7,30 @@ const reports = new Hono<{ Variables: { session: SessionPayload | null } }>();
 
 // GET /api/v1/reports/sales-ranking
 reports.get('/sales-ranking', async (c) => {
+  const session = c.get('session');
   const team = c.req.query('team') as 'AEC' | 'MFG' | undefined;
-  const where = team ? 'WHERE c.team = $1' : '';
-  const params = team ? [team] : [];
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let idx = 1;
+
+  // Role-based multi-team support
+  if (session?.role === 'Leader') {
+    if (session.secondaryTeam && session.secondaryTeam !== session.team) {
+      conditions.push(`c.team = ANY($${idx++})`);
+      params.push([session.team, session.secondaryTeam]);
+    } else {
+      conditions.push(`c.team = $${idx++}`);
+      params.push(session.team);
+    }
+  } else if (session?.role === 'Sales') {
+    conditions.push(`c.assigned_sales_id = $${idx++}`);
+    params.push(session.uid);
+  } else if (team) {
+    conditions.push(`c.team = $${idx++}`);
+    params.push(team);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const rows = await query<{
     sales_id: string | null; sales_name: string; customer_count: number;
@@ -58,13 +79,18 @@ reports.get('/ocr', async (c) => {
   const event = c.req.query('event'); // eventName (opsional)
   const eventDate = c.req.query('eventDate'); // yyyy-mm-dd (opsional, filter hari event)
 
-  const conditions = [`acquisition_context->>'source' = 'OCR'`];
+  const conditions: string[] = [];
   const params: any[] = [];
   let idx = 1;
 
   if (session.role === 'Leader') {
-    conditions.push(`team = $${idx++}`);
-    params.push(session.team);
+    if (session.secondaryTeam && session.secondaryTeam !== session.team) {
+      conditions.push(`team = ANY($${idx++})`);
+      params.push([session.team, session.secondaryTeam]);
+    } else {
+      conditions.push(`team = $${idx++}`);
+      params.push(session.team);
+    }
   } else if (session.role === 'Sales') {
     conditions.push(`assigned_sales_id = $${idx++}`);
     params.push(session.uid);

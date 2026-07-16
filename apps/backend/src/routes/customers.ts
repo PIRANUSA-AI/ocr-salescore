@@ -155,6 +155,10 @@ async function refreshImageUrl(c: Customer): Promise<Customer> {
 customers.get('/', async (c) => {
   const team = c.req.query('team') as 'AEC' | 'MFG' | undefined;
   const assignedSalesId = c.req.query('assignedSalesId');
+  const event = c.req.query('event');
+  const eventDate = c.req.query('eventDate');
+  const from = c.req.query('from');
+  const to = c.req.query('to');
   const session: SessionPayload | null = c.get('session');
 
   // Multi-team support: jika user punya secondaryTeam, return kedua tim
@@ -167,6 +171,10 @@ customers.get('/', async (c) => {
     assignedSalesId,
     team: teams ? undefined : team,
     teams,
+    event,
+    eventDate,
+    from,
+    to,
   });
   const withUrls = await Promise.all(list.map(refreshImageUrl));
   return c.json({ customers: withUrls });
