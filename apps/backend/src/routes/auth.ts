@@ -30,6 +30,7 @@ auth.post('/login', async (c) => {
     email: user.email,
     role: user.role,
     team: user.team,
+    secondaryTeam: user.secondary_team ?? null,
     photoURL: user.photo_url ?? undefined,
     salesCode: user.sales_code,
   };

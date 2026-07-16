@@ -15,7 +15,8 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM } from '@/types';
+import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM, getDefaultDayIndex, eventDateForDay } from '@/types';
+import { EventDaySelect } from '@/components/ui/event-day-select';
 
 const SALES_CODES = ['A-1', 'B-1', 'C-1', 'D-1', 'E-1', 'F-1', 'G-1'];
 
@@ -51,6 +52,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
     const [formAnswers, setFormAnswers] = useState<{ question: string; answer: string }[]>([]);
     const [salesCode, setSalesCode] = useState<string>('');
     const [eventName, setEventName] = useState(DEFAULT_EVENT_BY_TEAM.MFG);
+    const [dayIndex, setDayIndex] = useState(() => getDefaultDayIndex(DEFAULT_EVENT_BY_TEAM.MFG));
     const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('MFG');
     const [readingStep, setReadingStep] = useState(0);
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -228,7 +230,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                 acquisitionContext: {
                     source: 'OCR',
                     eventName: eventName.trim(),
-                    eventDate: new Date(),
+                    eventDate: eventDateForDay(eventName, dayIndex),
                 },
                 formAnswers,
             } as any);
@@ -360,6 +362,7 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                                 <Label htmlFor="eventName">Nama Event / Acara <span className="text-red-500">*</span></Label>
                                 <Select value={eventName} onValueChange={(val) => {
                                     setEventName(val);
+                                    setDayIndex(getDefaultDayIndex(val));
                                     const team = EVENT_TO_TEAM[val];
                                     if (team) {
                                         setCreatorTeam(team);
@@ -372,11 +375,13 @@ export function QuickOcrDialog({ isOpen, onOpenChange }: QuickOcrDialogProps) {
                                             <SelectItem key={e} value={e}>{e}</SelectItem>
                                         ))}
                                     </SelectContent>
-                                </Select>
-                            </div>
+                            </Select>
+                        </div>
 
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="salesCode">Kode Tim Sales <span className="text-red-500">*</span></Label>
+                        <EventDaySelect eventName={eventName} dayIndex={dayIndex} onDayChange={setDayIndex} />
+
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="salesCode">Kode Tim Sales <span className="text-red-500">*</span></Label>
                                 <div className="grid grid-cols-4 gap-2">
                                     {SALES_CODES.map((code) => (
                                         <Button key={code} type="button" variant={salesCode === code ? 'default' : 'outline'} size="sm" className="active:translate-y-px" disabled={status === 'saving'} onClick={() => setSalesCode(code)}>

@@ -18,5 +18,5 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sales_code = EXCLUDED.sales
 -- ─── Sample customer ───────────────────────────────────────────────
 INSERT INTO customers (id, name, email, phone, company, job_title, team, pipeline_status, acquisition_context) VALUES
   ('sample-cust-001', 'Budi Hartono', 'budi@example.com', '08123456789', 'PT Maju Jaya', 'Direktur Utama', 'AEC', 'Leads Generation 10%',
-   '{"source":"Webinar","eventName":"MFI 2025","eventDate":"2026-06-15"}')
+   '{"source":"Webinar","eventName":"IBT 2026","eventDate":"2026-06-15"}')
 ON CONFLICT (id) DO NOTHING;

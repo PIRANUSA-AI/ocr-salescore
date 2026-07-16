@@ -47,6 +47,46 @@ export const EVENT_TO_TEAM: Record<string, 'AEC' | 'MFG'> = {
     [DEFAULT_EVENT_BY_TEAM.MFG]: 'MFG',
 };
 
+// Mapping event → tanggal per hari (YYYY-MM-DD).
+// Index 0 = Day 1. Jumlah hari = panjang array.
+export const EVENT_DAYS: Record<string, string[]> = {
+    'IBT 2026': ['2026-07-08', '2026-07-09', '2026-07-10', '2026-07-11', '2026-07-12'],
+    'Manufacturing Surabaya 2026': ['2026-07-15', '2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19'],
+};
+
+// Date object untuk suatu tanggal "YYYY-MM-DD", di local noon (tahan timezone edge-case).
+export function eventDayDate(dateStr: string): Date {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0);
+}
+
+// Index hari (0-based) untuk tanggal tertentu dalam event, atau -1 kalau di luar rentang.
+export function getEventDayIndex(eventName: string, date: Date): number {
+    const days = EVENT_DAYS[eventName];
+    if (!days) return -1;
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return days.indexOf(iso);
+}
+
+// Default day index: selalu Day 1 (index 0). Tidak berpatokan tanggal — operator OCR yang menentukan manual.
+export function getDefaultDayIndex(_eventName: string): number {
+    return 0;
+}
+
+// Format panjang, mis. "Rabu, 8 Juli 2026".
+export function formatEventDay(eventName: string, dayIndex: number): string {
+    const days = EVENT_DAYS[eventName];
+    if (!days || !days[dayIndex]) return '';
+    return eventDayDate(days[dayIndex]).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Tanggal ISO untuk index hari tertentu (untuk disimpan ke acquisitionContext.eventDate).
+export function eventDateForDay(eventName: string, dayIndex: number): Date {
+    const days = EVENT_DAYS[eventName];
+    const dateStr = days && days[dayIndex] ? days[dayIndex] : null;
+    return dateStr ? eventDayDate(dateStr) : new Date();
+}
+
 export type CustomerSource = (typeof CUSTOMER_SOURCES)[number];
 
 

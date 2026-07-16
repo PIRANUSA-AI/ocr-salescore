@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, XCircle, Clock, Image as ImageIcon, ChevronLeft, X, RefreshCw } from 'lucide-react';
+import { Loader2, Camera, Upload, ScanLine, Check, RotateCcw, ChevronRight, XCircle, Clock, Image as ImageIcon, ChevronLeft, X, RefreshCw, LogOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useDashboard } from '@/app/dashboard/dashboard-context';
@@ -20,7 +20,8 @@ import { cn } from '@/lib/utils';
 import type { ExtractResult } from '@/lib/ocr/extract';
 import type { Confidence } from '@/lib/ocr/types';
 import type { Customer } from '@/types';
-import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM } from '@/types';
+import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM, getDefaultDayIndex, eventDateForDay, formatEventDay } from '@/types';
+import { EventDaySelect } from '@/components/ui/event-day-select';
 
 type ProductGroup = { label: string | null; options: readonly string[] };
 type TeamFormOptions = {
@@ -160,6 +161,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
   const [salesNotes, setSalesNotes] = useState('');
   const [salesCode, setSalesCode] = useState('');
   const [eventName, setEventName] = useState(DEFAULT_EVENT_BY_TEAM.AEC);
+  const [dayIndex, setDayIndex] = useState(() => getDefaultDayIndex(DEFAULT_EVENT_BY_TEAM.AEC));
   const [creatorTeam, setCreatorTeam] = useState<'AEC' | 'MFG'>('AEC');
 
   const salesPeople = useMemo(
@@ -175,6 +177,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     if (userProfile?.team) {
       setCreatorTeam(userProfile.team);
       setEventName(DEFAULT_EVENT_BY_TEAM[userProfile.team]);
+      setDayIndex(getDefaultDayIndex(DEFAULT_EVENT_BY_TEAM[userProfile.team]));
     }
   }, [userProfile]);
 
@@ -338,7 +341,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       toast({ variant: 'destructive', title: 'OCR Gagal', description: errMsg });
       setJobs(prev => prev.map(j => j.id === tempId ? { ...j, status: 'error', errorMessage: errMsg } : j));
     }
-  }, [userProfile, resetForm, toast]);
+  }, [userProfile, resetForm, toast, creatorTeam]);
 
   const handleDeleteJob = async (id: string) => {
     if (id.startsWith('temp-')) {
@@ -362,8 +365,22 @@ export function OcrCaptureView({ recentCustomers }: Props) {
     const idx = EVENT_OPTIONS.indexOf(eventName as (typeof EVENT_OPTIONS)[number]);
     const next = EVENT_OPTIONS[(idx + 1) % EVENT_OPTIONS.length];
     setEventName(next);
+    setDayIndex(getDefaultDayIndex(next));
     const team = EVENT_TO_TEAM[next];
     if (team) setCreatorTeam(team);
+  };
+
+  const handleHardReset = async () => {
+    try { await api.auth.logout(); } catch {}
+    try { localStorage.clear(); } catch {}
+    try { sessionStorage.clear(); } catch {}
+    if ('caches' in window) {
+      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      } catch {}
+    }
+    window.location.href = '/';
   };
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -430,7 +447,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         acquisitionContext: {
           source: 'OCR',
           eventName: eventName.trim(),
-          eventDate: new Date(),
+          eventDate: eventDateForDay(eventName, dayIndex),
         },
         formAnswers,
       } as any);
@@ -499,10 +516,27 @@ export function OcrCaptureView({ recentCustomers }: Props) {
               <ContactField label="Email" value={editableEmail} onChange={setEditableEmail} field={fields.email} />
             </div>
 
-            <div className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2">
-              <p className="text-xs text-muted-foreground">Event</p>
-              <p className="text-sm font-medium">{eventName}</p>
+            <div>
+              <Label>Event <span className="text-red-500">*</span></Label>
+              <Select value={eventName} onValueChange={(val) => {
+                setEventName(val);
+                setDayIndex(getDefaultDayIndex(val));
+                const team = EVENT_TO_TEAM[val];
+                if (team && team !== creatorTeam) {
+                  setCreatorTeam(team);
+                  setSalesCode('');
+                }
+              }}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EVENT_OPTIONS.map((e) => (
+                    <SelectItem key={e} value={e}>{e}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            <EventDaySelect eventName={eventName} dayIndex={dayIndex} onDayChange={setDayIndex} />
 
             <div>
               <Label>Tim</Label>
@@ -739,12 +773,24 @@ export function OcrCaptureView({ recentCustomers }: Props) {
       ) : (
         /* Idle state: Camera / Upload (only when no active or done-only) */
         <>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleHardReset}
+              className="flex items-center gap-1 rounded-full py-1 px-2 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              title="Clear cache & login ulang"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Reset
+            </button>
+          </div>
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <ScanLine className="h-5 w-5" /> Capture Lead
                 </CardTitle>
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={cycleEvent}
@@ -756,6 +802,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
                     {eventName}
                   </span>
                 </button>
+              </div>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
@@ -770,7 +817,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
               <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/30 p-2.5">
                 <RefreshCw className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Lead akan dicatat untuk event <span className="font-medium text-foreground">{eventName}</span> (tim {creatorTeam}).
+                  Lead akan dicatat untuk event <span className="font-medium text-foreground">{eventName}</span> (tim {creatorTeam}), <span className="font-medium text-foreground">Day {dayIndex + 1}</span>{formatEventDay(eventName, dayIndex) ? ` (${formatEventDay(eventName, dayIndex)})` : ''}.
                   Salah event? Ketuk ikon <RefreshCw className="inline h-3 w-3 -mt-0.5" /> di pojok kanan atas untuk ganti sebelum foto.
                 </p>
               </div>

@@ -252,7 +252,7 @@ export function CustomerEditDialog({ editDialogState, closeCustomerEditDialog, h
                                 </div>
                                 <div className="md:col-span-2 space-y-1">
                                     <Label>Nama Event / Konteks</Label>
-                                    <Input {...form.register('acquisitionContext.eventName')} placeholder="Contoh: Pameran MFI 2025, Visit ke PT ABC" disabled={isLoading} />
+                                    <Input {...form.register('acquisitionContext.eventName')} placeholder="Contoh: Pameran IBT 2026, Visit ke PT ABC" disabled={isLoading} />
                                     {form.formState.errors.acquisitionContext?.eventName && <p className="text-sm text-destructive">{form.formState.errors.acquisitionContext.eventName.message}</p>}
                                 </div>
                             </div>

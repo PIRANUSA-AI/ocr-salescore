@@ -8,6 +8,7 @@ type UserRow = {
   password_hash: string;
   role: 'Leader' | 'Sales' | 'Superadmin';
   team: 'AEC' | 'MFG';
+  secondary_team: 'AEC' | 'MFG' | null;
   photo_url: string | null;
   sales_code: string | null;
   leader_id: string | null;
@@ -22,6 +23,7 @@ function rowToProfile(row: UserRow): UserProfile {
     email: row.email,
     role: row.role,
     team: row.team,
+    secondaryTeam: row.secondary_team ?? null,
     photoURL: row.photo_url ?? undefined,
     salesCode: row.sales_code,
   };
