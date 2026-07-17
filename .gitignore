@@ -45,6 +45,11 @@ deploy-rules.mjs
 
 # Gambar test berisi data pribadi asli (jangan ke repo public)
 apps/frontend/public/test-gambar.*
+
+# Seed / dump DB berisi data customer asli (PII) — jangan di-commit
+db/seed-*.sql
+db/*-dump.sql
+*.seed.sql
 .vercel
 .claude
 .superpowers
