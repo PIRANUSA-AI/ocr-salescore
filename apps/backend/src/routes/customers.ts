@@ -247,11 +247,7 @@ customers.post('/manual', async (c) => {
   const source = acquisitionContext.source;
   const formattedProducts = products.map(normalizeProduct);
 
-  let combinedNotes = body.notes || '';
-  if (source === 'OCR' && formAnswers.length > 0) {
-    const formNotes = formAnswers.map(qa => `${qa.question}: ${qa.answer}`).join('\n');
-    combinedNotes = `${body.notes ? `${body.notes}\n` : ''}[Data dari Form OCR]\n${formNotes}`;
-  }
+  const combinedNotes = body.notes || '';
 
   const existing = body.email ? await customerRepo.findByEmail(body.email) : null;
   if (existing) {

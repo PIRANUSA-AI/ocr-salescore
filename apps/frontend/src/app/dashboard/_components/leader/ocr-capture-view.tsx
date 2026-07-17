@@ -431,18 +431,19 @@ export function OcrCaptureView({ recentCustomers }: Props) {
 
     setStatus('saving');
     try {
-      await api.customers.create({
+      await api.customers.createManual({
         name: editableName.trim(),
         company: editableCompany.trim(),
         jobTitle: editableJobTitle.trim(),
         phone: editablePhone.trim(),
         email: editableEmail.trim(),
         address: activeJob.result.address.value?.trim() || '',
-        team: creatorTeam,
+        creatorTeam,
         pipelineStatus: 'Leads Generation 10%',
         products: [],
         assignedSalesId: matchedSales?.uid ?? null,
         assignedSalesName: matchedSales?.name ?? null,
+        notes: `Sales: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: jobFields.imageUrl || '',
         imageKey: activeJob.result.imageKey || activeJob.result.imageUrl || '',
         acquisitionContext: {

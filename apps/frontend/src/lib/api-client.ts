@@ -39,7 +39,12 @@ function formatDate(value: any): string {
 function formatNotes(notes: any, formAnswers?: any[]): string {
   const parts: string[] = [];
   if (notes && typeof notes === 'object') {
-    if (notes.manual?.trim()) parts.push(notes.manual);
+    const manualRaw = notes.manual?.trim() || '';
+    if (manualRaw) {
+      const cut = manualRaw.indexOf('[Data dari Form OCR]');
+      const manualClean = (cut >= 0 ? manualRaw.slice(0, cut) : manualRaw).trim();
+      if (manualClean) parts.push(manualClean);
+    }
     if (notes.webinar?.length) {
       parts.push(notes.webinar.map((w: any) => `[Webinar] ${w.text}`).join('; '));
     }
