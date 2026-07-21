@@ -22,6 +22,7 @@ import type { Confidence } from '@/lib/ocr/types';
 import type { Customer } from '@/types';
 import { DEFAULT_EVENT_BY_TEAM, EVENT_OPTIONS, EVENT_TO_TEAM, getDefaultDayIndex, eventDateForDay, formatEventDay } from '@/types';
 import { EventDaySelect } from '@/components/ui/event-day-select';
+import { OcrExcelImport } from './ocr-excel-import';
 
 type ProductGroup = { label: string | null; options: readonly string[] };
 type TeamFormOptions = {
@@ -814,6 +815,13 @@ export function OcrCaptureView({ recentCustomers }: Props) {
               <Button size="lg" variant="outline" className="h-14" onClick={() => fileInputRef.current?.click()}>
                 <Upload className="h-5 w-5 mr-2" /> Unggah Gambar
               </Button>
+              <OcrExcelImport
+                allSales={allSales}
+                creatorTeam={creatorTeam}
+                eventName={eventName}
+                dayIndex={dayIndex}
+                onImported={() => window.location.reload()}
+              />
               <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFileSelected} />
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileSelected} />
               <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/30 p-2.5">
