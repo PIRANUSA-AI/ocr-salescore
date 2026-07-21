@@ -445,7 +445,7 @@ export function OcrCaptureView({ recentCustomers }: Props) {
         assignedSalesName: matchedSales?.name ?? null,
         notes: `Sales: ${salesCode}${salesNotes ? `\n\nCatatan Sales:\n${salesNotes}` : ''}`,
         imageUrl: jobFields.imageUrl || '',
-        imageKey: activeJob.result.imageKey || activeJob.result.imageUrl || '',
+        imageKey: activeJob.result.imageKey || '',
         acquisitionContext: {
           source: 'OCR',
           eventName: eventName.trim(),

@@ -31,6 +31,8 @@ import {
     Copy,
     Smartphone,
     ClipboardList,
+    ScanLine,
+    ExternalLink,
 } from 'lucide-react';
 
 import { format, parseISO, isValid, formatDistanceToNow } from 'date-fns';
@@ -311,6 +313,8 @@ export default function CustomerDetailPage() {
     }, [generationHistory]);
 
     const hasFormData = useMemo(() => customer && customer.formAnswers && customer.formAnswers.length > 0, [customer]);
+    const hasScanImage = useMemo(() => !!customer?.imageUrl, [customer]);
+    const hasOcrData = hasFormData || hasScanImage;
 
     const aiAssistantHistory = useMemo(() => {
         return generationHistory.filter(item => item.generationSource === 'AI Assistant' || !item.generationSource);
@@ -364,7 +368,7 @@ export default function CustomerDetailPage() {
 
     const tabOptions = [
         { value: 'timeline', label: 'Timeline Aktivitas' },
-        ...(hasFormData ? [{ value: 'form-data', label: 'Data Form' }] : []),
+        ...(hasOcrData ? [{ value: 'form-data', label: 'Data Form' }] : []),
         { value: 'reply-assistant', label: 'Riwayat Reply Assistant' },
         { value: 'ai-assistant', label: 'Riwayat AI Assistant' },
     ];
@@ -630,7 +634,7 @@ export default function CustomerDetailPage() {
                                 </Select>
                             </div>
                             <div className="hidden md:block">
-                                <TabsList className={cn("grid w-full", hasFormData ? "grid-cols-4" : "grid-cols-3")}>
+                                <TabsList className={cn("grid w-full", hasOcrData ? "grid-cols-4" : "grid-cols-3")}>
                                     {tabOptions.map(option => (
                                         <TabsTrigger key={option.value} value={option.value}>
                                             {option.label}
@@ -670,6 +674,46 @@ export default function CustomerDetailPage() {
                             </TabsContent>
 
                             <TabsContent value="form-data" className="mt-4">
+                                {hasScanImage && (
+                                    <Card className="mb-4">
+                                        <CardHeader>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div>
+                                                    <CardTitle className="flex items-center gap-2"><ScanLine /> Gambar Scan OCR</CardTitle>
+                                                    <CardDescription className="mt-1.5">
+                                                        Gambar asli yang dipindai. Cocokkan dengan hasil OCR di bawah untuk memastikan kebenaran data.
+                                                    </CardDescription>
+                                                </div>
+                                                <Button type="button" size="sm" variant="outline" asChild>
+                                                    <a href={customer.imageUrl} target="_blank" rel="noopener noreferrer">
+                                                        <ExternalLink className="h-4 w-4 mr-1" /> Ukuran Penuh
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="w-full aspect-video rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={customer.imageUrl}
+                                                    alt={`Scan OCR ${customer.name}`}
+                                                    className="w-full h-full object-contain"
+                                                    onError={(e) => {
+                                                        const target = e.currentTarget as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                        const parent = target.parentElement;
+                                                        if (parent && !parent.querySelector('.scan-error')) {
+                                                            const fallback = document.createElement('div');
+                                                            fallback.className = 'scan-error flex flex-col items-center text-muted-foreground py-8';
+                                                            fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px;opacity:0.4"><path d="M21 15V6a2 2 0 0 0-2-2H6L3 7l3 3"/><path d="m9 13 3 3 3-3"/><path d="M3 7v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/></svg><p class="text-xs">Tautan gambar kedaluwarsa. Muat ulang halaman untuk verifikasi.</p>';
+                                                            parent.appendChild(fallback);
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2"><ClipboardList /> Jawaban Form (Hasil OCR)</CardTitle>

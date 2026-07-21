@@ -150,8 +150,16 @@ async function refreshImageUrl(c: Customer): Promise<Customer> {
         const url = new URL(key);
         key = url.pathname.slice(1);
       }
-      c.imageUrl = await getPresignedUrl(key, 3600);
-    } catch { /* keep existing/stale imageUrl */ }
+      if (!key) {
+        c.imageUrl = undefined;
+      } else {
+        c.imageUrl = await getPresignedUrl(key, 3600);
+      }
+    } catch {
+      c.imageUrl = undefined;
+    }
+  } else {
+    c.imageUrl = undefined;
   }
   return c;
 }

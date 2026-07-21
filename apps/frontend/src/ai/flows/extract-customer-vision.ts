@@ -75,6 +75,7 @@ export async function extractCustomerVision(input: {
       alwaysSecondOpinion: input.alwaysSecondOpinion,
     });
     result.imageUrl = imageUrl;
+    result.imageKey = key;
 
     // Step 4: If formAnswers is empty, try slicing image and scanning each slice
     const hasFormAnswers = result.formAnswers && result.formAnswers.length > 0;
