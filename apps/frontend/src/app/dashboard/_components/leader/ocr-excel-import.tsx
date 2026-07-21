@@ -351,10 +351,15 @@ export function OcrExcelImport({ allSales, creatorTeam, eventName, dayIndex, onI
                   <TableHead className="w-8">Status</TableHead>
                   <TableHead>Nama</TableHead>
                   <TableHead>Company</TableHead>
+                  <TableHead>Jabatan</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Industri</TableHead>
                   <TableHead>Produk</TableHead>
+                  <TableHead>Software</TableHead>
+                  <TableHead>Rencana</TableHead>
+                  <TableHead>Tindak Lanjut</TableHead>
+                  <TableHead>Catatan</TableHead>
                   <TableHead>Sales</TableHead>
                   <TableHead>Skor</TableHead>
                 </TableRow>
@@ -379,10 +384,15 @@ export function OcrExcelImport({ allSales, creatorTeam, eventName, dayIndex, onI
                       </TableCell>
                       <TableCell className="text-xs font-medium whitespace-nowrap">{lead.name}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{lead.company || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{lead.jobTitle || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{lead.phone || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{lead.email || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{lead.industri || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{lead.produk || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{lead.software || lead.softwareFallback || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{lead.rencana || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{lead.followUp || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate" title={lead.catatan}>{lead.catatan || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
                         {lead.sales || '-'}
                         {salesUnmatched && (
