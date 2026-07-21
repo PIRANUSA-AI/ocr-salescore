@@ -118,7 +118,7 @@ reports.get('/ocr', async (c) => {
     `SELECT id, email, phone, pipeline_status, assigned_sales_id, assigned_sales_name,
             potential_revenue, created_at, acquisition_context
        FROM customers
-      WHERE ${conditions.join(' AND ')}`,
+      ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}`,
     params,
   );
 

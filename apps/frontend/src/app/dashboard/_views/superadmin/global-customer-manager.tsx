@@ -8,9 +8,10 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Search, ShieldAlert, Send } from "lucide-react";
+import { Search, ShieldAlert, Send, Eye } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { type Customer } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,7 @@ const getPriority = (customer: Customer): { level: 'High' | 'Medium' | 'Low' | n
 };
 
 export const GlobalCustomerManager = () => {
+    const router = useRouter();
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -63,6 +65,10 @@ export const GlobalCustomerManager = () => {
     const [isBlastEmailOpen, setIsBlastEmailOpen] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(20);
     const isMobile = useMediaQuery("(max-width: 768px)");
+
+    const handleNavigateToDetail = (customerId: string) => {
+        router.push(`/dashboard/customer/${customerId}`);
+    };
 
     useEffect(() => {
         setIsLoading(true);
@@ -214,13 +220,15 @@ export const GlobalCustomerManager = () => {
                                             <div
                                                 key={c.id}
                                                 data-state={selectedCustomers.includes(c.id) ? "selected" : ""}
-                                                className="p-3 border rounded-lg"
+                                                className="p-3 border rounded-lg active:bg-muted/50 transition-colors cursor-pointer"
+                                                onClick={() => handleNavigateToDetail(c.id)}
                                             >
                                                 <div className="flex items-start gap-2">
                                                     <Checkbox
                                                         className="mt-0.5 shrink-0"
                                                         checked={selectedCustomers.includes(c.id)}
                                                         onCheckedChange={(checked) => handleSelectRow(c.id, !!checked)}
+                                                        onClick={(e) => e.stopPropagation()}
                                                     />
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-start justify-between gap-2">
@@ -277,6 +285,7 @@ export const GlobalCustomerManager = () => {
                                             <TableHead>Status Pipeline</TableHead>
                                             <TableHead>Potensi Pendapatan</TableHead>
                                             <TableHead>Sales Ditugaskan</TableHead>
+                                            <TableHead className="w-[60px]">Aksi</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -290,14 +299,20 @@ export const GlobalCustomerManager = () => {
                                                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                                                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                                                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                                    <TableCell><Skeleton className="h-7 w-9" /></TableCell>
                                                 </TableRow>
                                             ))
                                         ) : paginatedCustomers.length > 0 ? (
                                             paginatedCustomers.map((c) => {
                                                 const priority = getPriority(c);
                                                 return (
-                                                    <TableRow key={c.id} data-state={selectedCustomers.includes(c.id) ? "selected" : ""}>
-                                                        <TableCell>
+                                                    <TableRow
+                                                        key={c.id}
+                                                        data-state={selectedCustomers.includes(c.id) ? "selected" : ""}
+                                                        className="cursor-pointer"
+                                                        onClick={() => handleNavigateToDetail(c.id)}
+                                                    >
+                                                        <TableCell onClick={(e) => e.stopPropagation()}>
                                                             <Checkbox
                                                                 checked={selectedCustomers.includes(c.id)}
                                                                 onCheckedChange={(checked) => handleSelectRow(c.id, !!checked)}
@@ -336,12 +351,23 @@ export const GlobalCustomerManager = () => {
                                                                 <span className='text-xs text-muted-foreground'>Belum Ditugaskan</span>
                                                             )}
                                                         </TableCell>
+                                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7"
+                                                                onClick={() => handleNavigateToDetail(c.id)}
+                                                                title="Lihat Detail"
+                                                            >
+                                                                <Eye className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </TableCell>
                                                     </TableRow>
                                                 )
                                             })
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={7} className="text-center text-muted-foreground h-24">
+                                                <TableCell colSpan={8} className="text-center text-muted-foreground h-24">
                                                     Belum ada data pelanggan.
                                                 </TableCell>
                                             </TableRow>
